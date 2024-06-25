@@ -9,4 +9,12 @@ let userId = 3242342;
 
 let isLoggedIn: boolean = false;
 
+let hero: string;
+
+function getHero() {
+  return "Batman";
+}
+
+hero = getHero();
+
 export {};
