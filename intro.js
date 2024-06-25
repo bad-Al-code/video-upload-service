@@ -1,2 +1,5 @@
-var user = { name: "al", age: 20 };
-console.log(user.email);
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+var greetings = "Hi, Al";
+greetings.toLowerCase();
+console.log(greetings);

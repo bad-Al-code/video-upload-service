@@ -1,3 +1,6 @@
-let user = { name: "al", age: 20 };
+let greetings: string = "Hi, Al";
 
-console.log(user.email);
+greetings.toLowerCase();
+console.log(greetings);
+
+export {};
