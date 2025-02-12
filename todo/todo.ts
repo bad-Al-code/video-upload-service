@@ -54,11 +54,10 @@ function saveTodos(todos: Todo[]): void {
     }
 }
 
-function removeTodo(id: number): void {
+function removeTodo(id: string): void {
     const todos = getTodos();
-    const idString = id.toString();
 
-    const index = todos.findIndex((todo) => todo.id === idString);
+    const index = todos.findIndex((todo) => todo.id === id);
     if (index === -1) {
         console.error(`❌ Todo with ID ${id} not found.`);
         return;
@@ -104,13 +103,7 @@ function cli(): void {
                     return;
                 }
 
-                const id = parseInt(options[0], 10);
-                if (isNaN(id)) {
-                    console.error('❌ Error: ID must be a number.');
-                    return;
-                }
-
-                removeTodo(id);
+                removeTodo(options[0]);
                 break;
 
             case 'list':
