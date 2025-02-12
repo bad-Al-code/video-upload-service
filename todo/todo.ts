@@ -1,29 +1,22 @@
 import fs from 'node:fs';
 import { randomUUID } from 'node:crypto';
 
-const todosPath = 'todo.json';
+import redis from './redis';
+
+const TODO_KEY = 'todos';
 
 interface Todo {
     id: string;
     task: string;
 }
 
-function getTodos(): Todo[] {
-    if (!fs.existsSync(todosPath)) {
-        return [];
-    }
-
-    try {
-        const data = fs.readFileSync(todosPath);
-        return JSON.parse(data.toString()) as Todo[];
-    } catch (error) {
-        console.error('Error reading todo file: ', error);
-        return [];
-    }
+async function getTodos(): Promise<Todo[]> {
+    const todoJSON = await redis.get(TODO_KEY);
+    return todoJSON ? JSON.parse(todoJSON) : [];
 }
 
-function addTodo(task: string): void {
-    const todos: Todo[] = getTodos();
+async function addTodo(task: string): Promise<void> {
+    const todos: Todo[] = await getTodos();
     const id = randomUUID();
 
     todos.push({ id, task });
@@ -32,8 +25,8 @@ function addTodo(task: string): void {
     console.log(`✅ Todo added: [${id}] ${task}`);
 }
 
-function listTodos(): void {
-    const todos: Todo[] = getTodos();
+async function listTodos(): Promise<void> {
+    const todos: Todo[] = await getTodos();
 
     if (todos.length === 0) {
         console.log('📂 No todos found.');
@@ -46,18 +39,14 @@ function listTodos(): void {
     });
 }
 
-function saveTodos(todos: Todo[]): void {
-    try {
-        fs.writeFileSync(todosPath, JSON.stringify(todos, null, 2));
-    } catch (error) {
-        console.error('Error saving todo file:', error);
-    }
+async function saveTodos(todos: Todo[]): Promise<void> {
+    await redis.set(TODO_KEY, JSON.stringify(todos));
 }
 
-function removeTodo(id: string): void {
-    const todos = getTodos();
-
+async function removeTodo(id: string): Promise<void> {
+    const todos: Todo[] = await getTodos();
     const index = todos.findIndex((todo) => todo.id === id);
+
     if (index === -1) {
         console.error(`❌ Todo with ID ${id} not found.`);
         return;
@@ -79,7 +68,7 @@ Usage:
 `);
 }
 
-function cli(): void {
+async function cli(): Promise<void> {
     const subCommand = process.argv[2];
     const options = process.argv.slice(3);
 
@@ -94,7 +83,7 @@ function cli(): void {
                     console.error('❌ Usage: todo add "TASK"');
                     return;
                 }
-                addTodo(options[0]);
+                await addTodo(options[0]);
                 break;
 
             case 'done':
@@ -103,7 +92,7 @@ function cli(): void {
                     return;
                 }
 
-                removeTodo(options[0]);
+                await removeTodo(options[0]);
                 break;
 
             case 'list':
@@ -111,7 +100,7 @@ function cli(): void {
                     console.error('❌ Usage: todo list');
                     return;
                 }
-                listTodos();
+                await listTodos();
                 break;
 
             default:
