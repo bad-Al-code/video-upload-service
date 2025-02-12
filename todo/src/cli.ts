@@ -1,23 +1,19 @@
 import { addTodo, listTodos, markTodoDone, removeTodo } from './todoService';
 import redis from './redisClient';
 
-/**
- * Display help menu.
- */
 function showHelp(): void {
     console.log(`
 Usage:
-  todo add "TASK"   - Add a new todo
-  todo list         - List all todos
-  todo done ID      - Mark a todo as completed 
-  todo delete ID    - Mark a todo as deleted
-  todo --help       - Show this help message
+  todo add "TASK"        - Add a new todo
+  todo list              - List all todos
+  todo list --completed  - List only completed todos
+  todo list --pending    - List only pending todos
+  todo done ID           - Mark a todo as completed
+  todo delete ID         - Mark a todo as deleted
+  todo --help            - Show this help message
 `);
 }
 
-/**
- * Parse CLI arguments and execute appropriate command.
- */
 async function cli(): Promise<void> {
     const subCommand = process.argv[2];
     const options = process.argv.slice(3);
