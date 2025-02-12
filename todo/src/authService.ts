@@ -35,7 +35,9 @@ export async function regiserUser(
 
     await redis.hmset(userKey, { username, passwordHash });
 
-    return '✅ User registered successfully!';
+    console.log('✅ User registered successfully!');
+
+    return await loginUser(username, password);
 }
 
 /**
