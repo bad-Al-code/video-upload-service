@@ -39,6 +39,7 @@ async function cli(): Promise<void> {
                 }
                 await markTodoDone(options[0]);
                 break;
+
             case 'delete':
                 if (options.length !== 1) {
                     console.error('❌ Usage: todo done ID');

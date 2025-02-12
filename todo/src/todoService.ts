@@ -2,29 +2,46 @@ import { randomUUID } from 'node:crypto';
 
 import redis from './redisClient';
 
-const TODO_KEY = 'todos';
-
 interface Todo {
     id: string;
     task: string;
     done: boolean;
 }
 
-export async function getTodos(): Promise<Todo[]> {
-    const todoJSON = await redis.get(TODO_KEY);
-    return todoJSON ? JSON.parse(todoJSON) : [];
+/**
+ * Retrieves all todos from Redis.
+ * @returns A list of all stored todos.
+ */
+async function getTodos(): Promise<Todo[]> {
+    const keys = await redis.keys('todo:*');
+
+    if (keys.length === 0) return [];
+
+    const todos = await Promise.all(
+        keys.map(async (key) => {
+            const todo = await redis.hgetall(key);
+
+            return {
+                id: key.replace('todo:', ''),
+                task: todo.task ?? 'Unknown Task',
+                done: todo.done === 'true',
+            };
+        }),
+    );
+
+    return todos;
 }
 
-async function saveTodos(todos: Todo[]): Promise<void> {
-    await redis.set(TODO_KEY, JSON.stringify(todos));
-}
-
+/**
+ * Adds a new todo and stores it in Redis as a separate key.
+ *
+ * @param task
+ */
 export async function addTodo(task: string): Promise<void> {
-    const todos = await getTodos();
     const id = randomUUID();
+    const todo: Todo = { id, task, done: false };
 
-    todos.push({ id, task, done: false });
-    await saveTodos(todos);
+    await redis.hset(`todo:${id}`, todo);
 
     console.log(`✅ Todo added: [${id}] ${task}`);
 }
@@ -65,31 +82,30 @@ export async function listTodos(
 }
 
 export async function removeTodo(id: string): Promise<void> {
-    const todos = await getTodos();
-    const index = todos.findIndex((todo) => todo.id === id);
+    const removed = await redis.del(`todo:${id}`);
 
-    if (index === -1) {
+    if (removed === 0) {
         console.error(`❌ Todo with ID ${id} not found.`);
         return;
     }
 
-    const removedTodo = todos.splice(index, 1)[0];
-    await saveTodos(todos);
-
-    console.log(`🗑️ Todo removed: [${removedTodo.id}] ${removedTodo.task}`);
+    console.log(`🗑️ Todo removed: [${id}]`);
 }
 
+/**
+ * Marks a todo as completed.
+ *
+ * @param id
+ */
 export async function markTodoDone(id: string): Promise<void> {
-    const todos: Todo[] = await getTodos();
-    const todo = todos.find((t) => t.id === id);
+    const todo = await redis.hgetall(`todo:${id}`);
 
-    if (!todo) {
+    if (!todo || !todo.task) {
         console.error(`❌ Todo with ID ${id} not found.`);
         return;
     }
 
-    todo.done = true;
-    await saveTodos(todos);
+    await redis.hset(`todo:${id}`, 'done', 'true');
 
-    console.log(`✅ Todo marked as done: [${todo.id}] ${todo.task}`);
+    console.log(`✅ Todo marked as done: [${id}] ${todo.task}`);
 }
