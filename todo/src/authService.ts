@@ -66,7 +66,7 @@ export async function loginUser(
     const sessionToken = randomUUID();
     const sessionKey = `${SESSION_PREFIX}${sessionToken}`;
 
-    await redis.setex(sessionKey, SESSION_EXPIRY, username);
+    await redis.set(sessionKey, username, 'EX', SESSION_EXPIRY);
 
     return sessionToken;
 }
