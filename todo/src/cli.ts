@@ -52,11 +52,26 @@ async function cli(): Promise<void> {
                 break;
 
             case 'list':
-                if (options.length !== 0) {
-                    console.error('❌ Usage: todo list');
+                if (options.length > 1) {
+                    console.error(
+                        '❌ Usage: todo list [--completed | --pending]',
+                    );
                     return;
                 }
-                await listTodos();
+
+                let filter: 'completed' | 'pending' | undefined;
+                if (options[0] === '--completed') {
+                    filter = 'completed';
+                } else if (options[0] === '--pending') {
+                    filter = 'pending';
+                } else if (options.length === 1) {
+                    console.error(
+                        '❌ Invalid option. Use --completed or --pending.',
+                    );
+                    return;
+                }
+
+                await listTodos(filter);
                 break;
 
             default:

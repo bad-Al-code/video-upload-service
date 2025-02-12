@@ -29,16 +29,36 @@ export async function addTodo(task: string): Promise<void> {
     console.log(`✅ Todo added: [${id}] ${task}`);
 }
 
-export async function listTodos(): Promise<void> {
-    const todos = await getTodos();
+/**
+ * Lists todos with optional filtering for completed or pending tasks.
+ *
+ * @param filter - 'completed' to show only completed tasks, 'pending' to show only inomplete tasks
+ */
+export async function listTodos(
+    filter?: 'completed' | 'pending',
+): Promise<void> {
+    const todos: Todo[] = await getTodos();
 
     if (todos.length === 0) {
         console.log('📂 No todos found.');
         return;
     }
 
+    let filteredTodos = todos;
+
+    if (filter === 'completed') {
+        filteredTodos = todos.filter((todo) => todo.done);
+    } else if (filter === 'pending') {
+        filteredTodos = todos.filter((todo) => !todo.done);
+    }
+
+    if (filteredTodos.length === 0) {
+        console.log(`📂 No ${filter} todos found.`);
+        return;
+    }
+
     console.log('📝 Your Todos:');
-    todos.forEach((todo) => {
+    filteredTodos.forEach((todo) => {
         const status = todo.done ? '✅' : '❌';
         console.log(`- [${todo.id}] ${status} ${todo.task}`);
     });
