@@ -7,39 +7,28 @@ const TODO_KEY = 'todos';
 interface Todo {
     id: string;
     task: string;
+    done: boolean;
 }
 
-/**
- * Fetch all todos from Redis.
- */
 export async function getTodos(): Promise<Todo[]> {
     const todoJSON = await redis.get(TODO_KEY);
     return todoJSON ? JSON.parse(todoJSON) : [];
 }
 
-/**
- * Save todos to Redis.
- */
 async function saveTodos(todos: Todo[]): Promise<void> {
     await redis.set(TODO_KEY, JSON.stringify(todos));
 }
 
-/**
- * Add a new todo.
- */
 export async function addTodo(task: string): Promise<void> {
     const todos = await getTodos();
     const id = randomUUID();
 
-    todos.push({ id, task });
+    todos.push({ id, task, done: false });
     await saveTodos(todos);
 
     console.log(`✅ Todo added: [${id}] ${task}`);
 }
 
-/**
- * List all todos.
- */
 export async function listTodos(): Promise<void> {
     const todos = await getTodos();
 
@@ -49,12 +38,12 @@ export async function listTodos(): Promise<void> {
     }
 
     console.log('📝 Your Todos:');
-    todos.forEach((todo) => console.log(`- [${todo.id}] ${todo.task}`));
+    todos.forEach((todo) => {
+        const status = todo.done ? '✅' : '❌';
+        console.log(`- [${todo.id}] ${status} ${todo.task}`);
+    });
 }
 
-/**
- * Remove a todo by ID.
- */
 export async function removeTodo(id: string): Promise<void> {
     const todos = await getTodos();
     const index = todos.findIndex((todo) => todo.id === id);
@@ -68,4 +57,19 @@ export async function removeTodo(id: string): Promise<void> {
     await saveTodos(todos);
 
     console.log(`🗑️ Todo removed: [${removedTodo.id}] ${removedTodo.task}`);
+}
+
+export async function markTodoDone(id: string): Promise<void> {
+    const todos: Todo[] = await getTodos();
+    const todo = todos.find((t) => t.id === id);
+
+    if (!todo) {
+        console.error(`❌ Todo with ID ${id} not found.`);
+        return;
+    }
+
+    todo.done = true;
+    await saveTodos(todos);
+
+    console.log(`✅ Todo marked as done: [${todo.id}] ${todo.task}`);
 }
