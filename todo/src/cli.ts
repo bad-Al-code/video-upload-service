@@ -1,5 +1,6 @@
 import { addTodo, listTodos, markTodoDone, removeTodo } from './todoService';
 import redis from './redisClient';
+import { authenticate, regiserUser } from './authService';
 
 function showHelp(): void {
     console.log(`
@@ -22,6 +23,31 @@ async function cli(): Promise<void> {
         switch (subCommand) {
             case '--help':
                 showHelp();
+                break;
+
+            case 'register':
+                if (options.length !== 2) {
+                    console.error('❌ Usage: todo register USERNAME PASSWORD');
+                    return;
+                }
+                console.log(await regiserUser(options[0], options[1]));
+                break;
+
+            case 'login':
+                if (options.length !== 2) {
+                    console.error('❌ Usage: todo login USERNAME PASSWORD');
+                    return;
+                }
+                const isAuthenticated = await authenticate(
+                    options[0],
+                    options[1],
+                );
+                if (isAuthenticated) {
+                    console.log('✅ Login successful!');
+                } else {
+                    console.error('❌ Login failed!');
+                }
+
                 break;
 
             case 'add':
