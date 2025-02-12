@@ -10,13 +10,16 @@ import {
 function showHelp(): void {
     console.log(`
 Usage:
-  todo add "TASK"        - Add a new todo
-  todo list              - List all todos
-  todo list --completed  - List only completed todos
-  todo list --pending    - List only pending todos
-  todo done ID           - Mark a todo as completed
-  todo delete ID         - Mark a todo as deleted
-  todo --help            - Show this help message
+  todo register USERNAME PASSWORD  - Register a new user & get a session token
+  todo login USERNAME PASSWORD     - Login and receive a session token
+  todo logout SESSION_TOKEN        - Logout and remove session
+  todo validate SESSION_TOKEN      - Validate session token
+
+  todo add "TASK"    - Add a new todo (requires session)
+  todo list          - List all todos (requires session)
+  todo done ID       - Mark a todo as completed (requires session)
+  todo delete ID     - Delete a todo (requires session)
+  todo --help        - Show this help message
 `);
 }
 
@@ -35,7 +38,10 @@ async function cli(): Promise<void> {
                     console.error('❌ Usage: todo register USERNAME PASSWORD');
                     return;
                 }
-                console.log(await regiserUser(options[0], options[1]));
+                let sessionToken = await regiserUser(options[0], options[1]);
+                console.log(
+                    `✅ User registered successfully! Your session token: ${sessionToken}`,
+                );
                 break;
 
             case 'login':
@@ -43,7 +49,7 @@ async function cli(): Promise<void> {
                     console.error('❌ Usage: todo login USERNAME PASSWORD');
                     return;
                 }
-                const sessionToken = await loginUser(options[0], options[1]);
+                sessionToken = await loginUser(options[0], options[1]);
                 if (sessionToken) {
                     console.log(
                         `✅ Login successful! Your session token: ${sessionToken}`,
