@@ -108,6 +108,9 @@ async function cli(): Promise<void> {
         }
     } catch (error) {
         console.error('Unexpected error: ', error);
+    } finally {
+        await redis.quit();
+        console.log('🔌 Redis connection closed.');
     }
 }
 
