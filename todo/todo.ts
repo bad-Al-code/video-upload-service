@@ -54,3 +54,47 @@ function removeTodos(id: number): void {
     saveTodos(todos);
     console.log(`Removed Todo: ${removedTodo.id}: ${removedTodo.task}`);
 }
+
+function cli(): void {
+    const subCommand = process.argv[2];
+    const options = process.argv.slice(3);
+
+    switch (subCommand) {
+        case '--help':
+            console.log('todo add TASK \t\t add todo');
+            console.log('todo done ID \t\t complete a todo');
+            console.log('todo list \t\t list todo');
+
+        case 'add':
+            if (options.length === 1) {
+                addTodo(options[0]);
+            } else {
+                console.log(`Invalid number of suboptions`);
+            }
+            break;
+        case 'done':
+            if (options.length === 1) {
+                const id = parseInt(options[0]);
+                if (isNaN(id)) {
+                    console.log(`Options must be number`);
+                } else {
+                    removeTodos(id);
+                }
+            } else {
+                console.log(`Invalid number of suboptions`);
+            }
+            break;
+        case 'list':
+            if (options.length === 0) {
+                listTodos();
+            } else {
+                console.log(`Invalid number of suboptions`);
+            }
+            break;
+
+        default:
+            console.log('Invalid commands');
+    }
+}
+
+cli();
