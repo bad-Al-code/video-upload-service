@@ -13,87 +13,119 @@ function getTodos(): Todo[] {
         return [];
     }
 
-    const data = fs.readFileSync(todosPath);
-    return JSON.parse(data.toString()) as Todo[];
+    try {
+        const data = fs.readFileSync(todosPath);
+        return JSON.parse(data.toString()) as Todo[];
+    } catch (error) {
+        console.error('Error reading todo file: ', error);
+        return [];
+    }
 }
 
 function addTodo(task: string): void {
     const todos: Todo[] = getTodos();
     const id = randomUUID();
-    todos.push({ id, task });
 
+    todos.push({ id, task });
     saveTodos(todos);
-    console.log(`Saved Todo: ${id}, ${task}`);
+
+    console.log(`✅ Todo added: [${id}] ${task}`);
 }
 
 function listTodos(): void {
     const todos: Todo[] = getTodos();
 
-    for (let i = 0; i < todos.length; i++) {
-        console.log(`${todos[i].id}: ${todos[i].task}`);
+    if (todos.length === 0) {
+        console.log('📂 No todos found.');
+        return;
     }
+
+    console.log('📝 Your Todos:');
+    todos.forEach((todo) => {
+        console.log(`- [${todo.id}] ${todo.task}`);
+    });
 }
 
 function saveTodos(todos: Todo[]): void {
-    fs.writeFileSync(todosPath, JSON.stringify(todos));
+    try {
+        fs.writeFileSync(todosPath, JSON.stringify(todos, null, 2));
+    } catch (error) {
+        console.error('Error saving todo file:', error);
+    }
 }
 
-function removeTodos(id: number): void {
-    const todos: Todo[] = getTodos();
-    const taskId = id.toString();
+function removeTodo(id: number): void {
+    const todos = getTodos();
+    const idString = id.toString();
 
-    const index = todos.findIndex(function (todo) {
-        return todo.id === taskId;
-    });
-
+    const index = todos.findIndex((todo) => todo.id === idString);
     if (index === -1) {
-        throw new Error(`Could not found with id: ${taskId}`);
+        console.error(`❌ Todo with ID ${id} not found.`);
+        return;
     }
 
     const removedTodo = todos.splice(index, 1)[0];
     saveTodos(todos);
-    console.log(`Removed Todo: ${removedTodo.id}: ${removedTodo.task}`);
+
+    console.log(`🗑️ Todo removed: [${removedTodo.id}] ${removedTodo.task}`);
+}
+
+function showHelp(): void {
+    console.log(`
+Usage:
+  todo add "TASK"   - Add a new todo
+  todo list         - List all todos
+  todo done ID      - Mark a todo as completed (delete)
+  todo --help       - Show this help message
+`);
 }
 
 function cli(): void {
     const subCommand = process.argv[2];
     const options = process.argv.slice(3);
 
-    switch (subCommand) {
-        case '--help':
-            console.log('todo add TASK \t\t add todo');
-            console.log('todo done ID \t\t complete a todo');
-            console.log('todo list \t\t list todo');
+    try {
+        switch (subCommand) {
+            case '--help':
+                showHelp();
+                break;
 
-        case 'add':
-            if (options.length === 1) {
-                addTodo(options[0]);
-            } else {
-                console.log(`Invalid number of suboptions`);
-            }
-            break;
-        case 'done':
-            if (options.length === 1) {
-                const id = parseInt(options[0]);
-                if (isNaN(id)) {
-                    console.log(`Options must be number`);
-                } else {
-                    removeTodos(id);
+            case 'add':
+                if (options.length !== 1) {
+                    console.error('❌ Usage: todo add "TASK"');
+                    return;
                 }
-            } else {
-                console.log(`Invalid number of suboptions`);
-            }
-            break;
-        case 'list':
-            if (options.length === 0) {
-                listTodos();
-            } else {
-                console.log(`Invalid number of suboptions`);
-            }
-            break;
+                addTodo(options[0]);
+                break;
 
-        default:
-            console.log('Invalid commands');
+            case 'done':
+                if (options.length !== 1) {
+                    console.error('❌ Usage: todo done ID');
+                    return;
+                }
+
+                const id = parseInt(options[0], 10);
+                if (isNaN(id)) {
+                    console.error('❌ Error: ID must be a number.');
+                    return;
+                }
+
+                removeTodo(id);
+                break;
+
+            case 'list':
+                if (options.length !== 0) {
+                    console.error('❌ Usage: todo list');
+                    return;
+                }
+                listTodos();
+                break;
+
+            default:
+                console.error('❌ Invalid command. Use --help for usage info.');
+        }
+    } catch (error) {
+        console.error('Unexpected error: ', error);
     }
 }
 
