@@ -22,7 +22,7 @@ interface User {
 export async function regiserUser(
     username: string,
     password: string,
-): Promise<string> {
+): Promise<string | null> {
     const userKey = `${USER_PREFIX}${username}`;
 
     const exists = await redis.exists(userKey);
@@ -34,8 +34,6 @@ export async function regiserUser(
     const passwordHash = await bcrypt.hash(password, saltRounds);
 
     await redis.hmset(userKey, { username, passwordHash });
-
-    console.log('✅ User registered successfully!');
 
     return await loginUser(username, password);
 }
@@ -50,7 +48,7 @@ export async function regiserUser(
 export async function loginUser(
     username: string,
     password: string,
-): Promise<string> {
+): Promise<string | null> {
     const userKey = `${USER_PREFIX}${username}`;
 
     const userData = await redis.hgetall(userKey);
@@ -61,6 +59,7 @@ export async function loginUser(
     const match = await bcrypt.compare(password, userData.passwordHash);
     if (!match) {
         console.error('❌ Invalid username or password.');
+        return null;
     }
 
     const sessionToken = randomUUID();

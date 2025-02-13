@@ -49,14 +49,16 @@ async function cli(): Promise<void> {
                     console.error('❌ Usage: todo login USERNAME PASSWORD');
                     return;
                 }
-                let loginToken = await loginUser(options[0], options[1]);
-                if (loginToken) {
-                    console.log(
-                        `✅ Login successful! Your session token: ${loginToken}`,
-                    );
-                } else {
-                    console.error('❌ Login failed!');
+                const loginToken = await loginUser(options[0], options[1]);
+
+                if (!loginToken) {
+                    return;
                 }
+
+                console.log(
+                    `✅ Login successful! Your session token: ${loginToken}`,
+                );
+
                 break;
 
             case 'logout':
