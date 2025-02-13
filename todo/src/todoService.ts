@@ -21,12 +21,13 @@ async function getTodos(username: string): Promise<Todo[]> {
 
     if (keys.length === 0) return [];
 
+    console.log(`🔍 Fetching todos for user: ${username}, Found keys:`, keys);
+
     const todos = await Promise.all(
         keys.map(async (key) => {
             const todo = await redis.hgetall(key);
-
             return {
-                id: key.replace(`todo:${username}:`, ''),
+                id: key.split(':').pop() ?? 'Unknown ID',
                 task: todo.task ?? 'Unknown Task',
                 done: todo.done === 'true',
                 owner: username,
@@ -52,9 +53,12 @@ export async function addTodo(
     }
 
     const id = randomUUID();
-    const todo: Todo = { id, task, done: false, owner: username };
+    const todoKey = `todo:${username}:${id}`;
 
-    await redis.set(`todo:${id}`, JSON.stringify(todo));
+    await redis.hset(todoKey, {
+        task,
+        done: 'false',
+    });
 
     console.log(`✅ Todo added by ${username}: [${id}] ${task}`);
 }

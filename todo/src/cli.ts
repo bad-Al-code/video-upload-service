@@ -108,31 +108,20 @@ async function cli(): Promise<void> {
                 break;
 
             case 'list':
-                if (options.length > 2) {
+                if (options.length < 1 || options.length > 2) {
                     console.error(
-                        '❌ Usage: todo list [--completed | --pending]',
-                    );
-                    return;
-                }
-
-                if (options.length === 0) {
-                    console.error(
-                        '❌ Missing session token. Usage: todo list SESSION_TOKEN [--completed | --pending]',
+                        '❌ Usage: todo list SESSION_TOKEN [--completed | --pending]',
                     );
                     return;
                 }
 
                 const listSessionToken = options[0];
                 let filter: 'completed' | 'pending' | undefined;
-                if (options[0] === '--completed') {
+
+                if (options[1] === '--completed') {
                     filter = 'completed';
-                } else if (options[0] === '--pending') {
+                } else if (options[1] === '--pending') {
                     filter = 'pending';
-                } else if (options.length === 1) {
-                    console.error(
-                        '❌ Invalid option. Use --completed or --pending.',
-                    );
-                    return;
                 }
 
                 await listTodos(listSessionToken, filter);
