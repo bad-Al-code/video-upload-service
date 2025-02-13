@@ -1,11 +1,13 @@
 import { randomUUID } from 'node:crypto';
 
 import redis from './redisClient';
+import { validateSession } from './authService';
 
 interface Todo {
     id: string;
     task: string;
     done: boolean;
+    owner: string;
 }
 
 /**
@@ -25,6 +27,7 @@ async function getTodos(): Promise<Todo[]> {
                 id: key.replace('todo:', ''),
                 task: todo.task ?? 'Unknown Task',
                 done: todo.done === 'true',
+                owner: '',
             };
         }),
     );
@@ -37,13 +40,21 @@ async function getTodos(): Promise<Todo[]> {
  *
  * @param task
  */
-export async function addTodo(task: string): Promise<void> {
+export async function addTodo(
+    sessionToken: string,
+    task: string,
+): Promise<void> {
+    const username = await validateSession(sessionToken);
+    if (!username) {
+        throw new Error('❌ Unauthorized: Invalid session.');
+    }
+
     const id = randomUUID();
-    const todo: Todo = { id, task, done: false };
+    const todo: Todo = { id, task, done: false, owner: username };
 
-    await redis.hset(`todo:${id}`, todo);
+    await redis.set(`todo:${id}`, JSON.stringify(todo));
 
-    console.log(`✅ Todo added: [${id}] ${task}`);
+    console.log(`✅ Todo added by ${username}: [${id}] ${task}`);
 }
 
 /**

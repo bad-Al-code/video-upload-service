@@ -38,9 +38,9 @@ async function cli(): Promise<void> {
                     console.error('❌ Usage: todo register USERNAME PASSWORD');
                     return;
                 }
-                let sessionToken = await regiserUser(options[0], options[1]);
+                const registerToken = await regiserUser(options[0], options[1]);
                 console.log(
-                    `✅ User registered successfully! Your session token: ${sessionToken}`,
+                    `✅ User registered successfully! Your session token: ${registerToken}`,
                 );
                 break;
 
@@ -49,10 +49,10 @@ async function cli(): Promise<void> {
                     console.error('❌ Usage: todo login USERNAME PASSWORD');
                     return;
                 }
-                sessionToken = await loginUser(options[0], options[1]);
-                if (sessionToken) {
+                let loginToken = await loginUser(options[0], options[1]);
+                if (loginToken) {
                     console.log(
-                        `✅ Login successful! Your session token: ${sessionToken}`,
+                        `✅ Login successful! Your session token: ${loginToken}`,
                     );
                 } else {
                     console.error('❌ Login failed!');
@@ -82,11 +82,11 @@ async function cli(): Promise<void> {
                 break;
 
             case 'add':
-                if (options.length !== 1) {
-                    console.error('❌ Usage: todo add "TASK"');
+                if (options.length !== 2) {
+                    console.error('❌ Usage: todo add SESSION_TOKEN "TASK"');
                     return;
                 }
-                await addTodo(options[0]);
+                await addTodo(options[0], options[1]);
                 break;
 
             case 'done':
