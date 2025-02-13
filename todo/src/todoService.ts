@@ -102,31 +102,62 @@ export async function listTodos(
     });
 }
 
-export async function removeTodo(id: string): Promise<void> {
-    const removed = await redis.del(`todo:${id}`);
-
-    if (removed === 0) {
-        console.error(`❌ Todo with ID ${id} not found.`);
+/**
+ * Removes a todo, ensuring the user owns it.
+ *
+ * @param {string} sessionToken - The session token of the user.
+ * @param {string} id - The ID of the todo to remove.
+ */
+export async function removeTodo(
+    sessionToken: string,
+    id: string,
+): Promise<void> {
+    const username = await validateSession(sessionToken);
+    if (!username) {
+        console.error('❌ Unauthorized: Invalid session.');
         return;
     }
 
-    console.log(`🗑️ Todo removed: [${id}]`);
+    const todoKey = `todo:${username}:${id}`;
+    const todo = await redis.hgetall(todoKey);
+
+    if (!todo || !todo.task) {
+        console.error(
+            `❌ Todo with ID ${id} not found or does not belong to you.`,
+        );
+        return;
+    }
+
+    await redis.del(todoKey);
+    console.log(`🗑️ Todo removed: [${id}] ${todo.task}`);
 }
 
 /**
- * Marks a todo as completed.
+ * Marks a todo as completed, ensuring the user owns it.
  *
- * @param id
+ * @param {string} sessionToken - The session token of the user.
+ * @param {string} id - The ID of the todo to mark as completed.
  */
-export async function markTodoDone(id: string): Promise<void> {
-    const todo = await redis.hgetall(`todo:${id}`);
-
-    if (!todo || !todo.task) {
-        console.error(`❌ Todo with ID ${id} not found.`);
+export async function markTodoDone(
+    sessionToken: string,
+    id: string,
+): Promise<void> {
+    const username = await validateSession(sessionToken);
+    if (!username) {
+        console.error('❌ Unauthorized: Invalid session.');
         return;
     }
 
-    await redis.hset(`todo:${id}`, 'done', 'true');
+    const todoKey = `todo:${username}:${id}`;
+    const todo = await redis.hgetall(todoKey);
 
+    if (!todo || !todo.task) {
+        console.error(
+            `❌ Todo with ID ${id} not found or does not belong to you.`,
+        );
+        return;
+    }
+
+    await redis.hset(todoKey, 'done', 'true');
     console.log(`✅ Todo marked as done: [${id}] ${todo.task}`);
 }
