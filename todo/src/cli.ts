@@ -90,29 +90,37 @@ async function cli(): Promise<void> {
                 break;
 
             case 'done':
-                if (options.length !== 1) {
+                if (options.length !== 2) {
                     console.error('❌ Usage: todo done ID');
                     return;
                 }
-                await markTodoDone(options[0]);
+                await markTodoDone(options[0], options[1]);
                 break;
 
             case 'delete':
-                if (options.length !== 1) {
+                if (options.length !== 2) {
                     console.error('❌ Usage: todo done ID');
                     return;
                 }
-                await removeTodo(options[0]);
+                await removeTodo(options[0], options[1]);
                 break;
 
             case 'list':
-                if (options.length > 1) {
+                if (options.length > 2) {
                     console.error(
                         '❌ Usage: todo list [--completed | --pending]',
                     );
                     return;
                 }
 
+                if (options.length === 0) {
+                    console.error(
+                        '❌ Missing session token. Usage: todo list SESSION_TOKEN [--completed | --pending]',
+                    );
+                    return;
+                }
+
+                const listSessionToken = options[0];
                 let filter: 'completed' | 'pending' | undefined;
                 if (options[0] === '--completed') {
                     filter = 'completed';
@@ -125,7 +133,7 @@ async function cli(): Promise<void> {
                     return;
                 }
 
-                await listTodos(filter);
+                await listTodos(listSessionToken, filter);
                 break;
 
             default:
