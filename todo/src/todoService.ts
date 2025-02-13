@@ -11,11 +11,13 @@ interface Todo {
 }
 
 /**
- * Retrieves all todos from Redis.
- * @returns A list of all stored todos.
+ * Retrieves all todos for a specific user from Redis.
+ *
+ * @param {string} username - The username of the user whose todos are being retrieved.
+ * @return {Promise<Todo[]>} A list of the user's stored todos.
  */
-async function getTodos(): Promise<Todo[]> {
-    const keys = await redis.keys('todo:*');
+async function getTodos(username: string): Promise<Todo[]> {
+    const keys = await redis.keys(`todo:${username}:*`);
 
     if (keys.length === 0) return [];
 
@@ -24,10 +26,10 @@ async function getTodos(): Promise<Todo[]> {
             const todo = await redis.hgetall(key);
 
             return {
-                id: key.replace('todo:', ''),
+                id: key.replace(`todo:${username}:`, ''),
                 task: todo.task ?? 'Unknown Task',
                 done: todo.done === 'true',
-                owner: '',
+                owner: username,
             };
         }),
     );
@@ -60,12 +62,20 @@ export async function addTodo(
 /**
  * Lists todos with optional filtering for completed or pending tasks.
  *
- * @param filter - 'completed' to show only completed tasks, 'pending' to show only inomplete tasks
+ * @param { string} sessionToken
+ * @param{ 'completed' | 'pending'} [filter ]- 'completed' to show only completed tasks, 'pending' to show only inomplete tasks
  */
 export async function listTodos(
+    sessionToken: string,
     filter?: 'completed' | 'pending',
 ): Promise<void> {
-    const todos: Todo[] = await getTodos();
+    const username = await validateSession(sessionToken);
+    if (!username) {
+        console.error('❌ Invalid session. Please log in.');
+        return;
+    }
+
+    const todos: Todo[] = await getTodos(username);
 
     if (todos.length === 0) {
         console.log('📂 No todos found.');
