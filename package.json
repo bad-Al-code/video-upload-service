@@ -3,6 +3,7 @@
     "version": "1.0.0",
     "main": "index.js",
     "scripts": {
+        "build": "tsc",
         "format": "prettier . --write",
         "format:check": "prettier '**/*.ts' --check",
         "prepare": "husky",
