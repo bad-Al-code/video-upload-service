@@ -13,6 +13,6 @@ jobs:
               with:
                   node-version: '20.x'
             - name: install dependencies
-              run: npm run ci
+              run: npm ci
             - name: build the app
-              run: nom run build
+              run: npm run build
