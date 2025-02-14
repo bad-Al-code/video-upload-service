@@ -16,7 +16,7 @@ interface Todo {
  * @param {string} username - The username of the user whose todos are being retrieved.
  * @return {Promise<Todo[]>} A list of the user's stored todos.
  */
-async function getTodos(username: string): Promise<Todo[]> {
+export async function getTodos(username: string): Promise<Todo[]> {
     const keys = await redis.keys(`todo:${username}:*`);
 
     if (keys.length === 0) return [];
