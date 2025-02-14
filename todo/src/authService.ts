@@ -7,10 +7,10 @@ const USER_PREFIX = 'user:';
 const SESSION_PREFIX = 'session:';
 const SESSION_EXPIRY = 3600;
 
-interface User {
-    username: string;
-    password: string;
-}
+// interface User {
+//     username: string;
+//     password: string;
+// }
 
 /**
  * Register a user
