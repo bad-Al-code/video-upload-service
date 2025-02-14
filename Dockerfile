@@ -1,5 +1,5 @@
 FROM node:alpine3.21 AS build 
-WORKDIR /apo 
+WORKDIR /app
 COPY package.json package-lock.json ./
 RUN npm ci 
 COPY . . 
