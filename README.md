@@ -1,1 +1,1 @@
-[test badge](https://github.com/<OWNER>/<REPOSITORY>/actions/workflows/ci.yml/badge.svg)
+![test badge](https://github.com/bad-al-code/Typescript/actions/workflows/ci.yml/badge.svg)
