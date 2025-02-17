@@ -1,26 +1,20 @@
 import 'dotenv/config';
+import { redis } from './config/db';
+import { cacheService } from './services/cache.service';
 
-import express, { Request, Response } from 'express';
-import { Resend } from 'resend';
+async function testCache() {
+    await cacheService.set('A', { name: 'One', age: 10 }, 3600);
+    const user = await cacheService.get('A');
 
-const app = express();
-const resend = new Resend(process.env.RESEND_API_KEY);
+    console.log('Cache: ', user);
 
-app.get('/', async (req: Request, res: Response): Promise<any> => {
-    const { data, error } = await resend.emails.send({
-        from: process.env.DOMAIN_NAME as string,
-        to: 'emailforsomework@gmail.com',
-        subject: 'hello world',
-        html: '<strong>it works!</strong>',
-    });
+    await cacheService.del('A');
+}
 
-    if (error) {
-        return res.status(400).json({ error });
-    }
+async function main() {
+    await redis;
 
-    res.status(200).json({ data });
-});
+    await testCache();
+}
 
-app.listen(3000, () => {
-    console.log('Listening on http://localhost:3000');
-});
+main();
