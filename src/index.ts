@@ -1,22 +1,16 @@
 import 'dotenv/config';
 import { redis } from './config/db';
-import { cacheService } from './services/cache.service';
+import { Server } from 'node:http';
+import app from './app';
 
-async function cacheStaticPage() {
-    const cacheKey = 'page:index';
-    const cachedPage = await cacheService.getCachePage(cacheKey);
+const server = new Server(app);
 
-    if (!cachedPage) {
-        console.log('No cached page found. Caching now...');
-        await cacheService.cachePage(cacheKey, 'views/index.html');
-    } else {
-        console.log('Page is already cached');
-    }
-}
 async function main() {
     await redis;
 
-    cacheStaticPage();
+    server.listen(3000, () => {
+        console.log('Listening on port 3000');
+    });
 }
 
 main();
