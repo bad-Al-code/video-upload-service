@@ -1,113 +1,38 @@
+import path from 'node:path';
+import fs from 'node:fs/promises';
+
 import { redis } from '../config/db';
 
 interface CacheService {
-    set: (key: string, value: any, expiration?: number) => Promise<void>;
-    get: (key: string) => Promise<any>;
-    del: (key: string) => Promise<void>;
-    ttl: (key: string) => Promise<number | null>;
-    setBulk: (
-        items: { key: string; value: any; expiration?: number }[],
+    cachePage: (
+        key: string,
+        filePath: string,
+        expiration?: number,
     ) => Promise<void>;
-    getBulk: (keys: string[]) => Promise<Record<string, any>>;
+    getCachePage: (key: string) => Promise<string | null>;
 }
 
 const cacheService: CacheService = {
-    /**
-     * @param key
-     * @param value
-     * @param expiration
-     */
-    async set(key, value, expiration = 3000) {
+    async cachePage(key: string, filePath: string, expiration = 600) {
         try {
-            const data = JSON.stringify(value);
-            await redis.set(key, data, 'EX', expiration);
-
-            console.log(`Cached: ${key}`);
-        } catch (error) {
-            console.error(`Error cacching ${key}: `, error);
-        }
-    },
-
-    /**
-     * @param key
-     * @returns
-     */
-    async get(key) {
-        try {
-            const data = await redis.get(key);
-            return data ? JSON.parse(data) : null;
-        } catch (error) {
-            console.error(`Error fetching cache ${key}:`, error);
-            return null;
-        }
-    },
-
-    /**
-     * @param key
-     */
-    async del(key) {
-        try {
-            await redis.del(key);
-            console.log(`Deleted cache: ${key}`);
-        } catch (error) {
-            console.error(`Error deleting cache ${key}:`, error);
-        }
-    },
-
-    /**
-     * @param key
-     * @returns
-     */
-    async ttl(key) {
-        try {
-            const time = await redis.ttl(key);
-            return time >= 0 ? time : null;
-        } catch (error) {
-            console.error(`Error getting TTL for ${key}: `, error);
-            return null;
-        }
-    },
-
-    /**
-     * @param items
-     */
-    async setBulk(items) {
-        try {
-            const pipeline = redis.pipeline();
-            items.forEach(({ key, value, expiration = 3600 }) => {
-                const data = JSON.stringify(value);
-                if (expiration > 0) {
-                    pipeline.set(key, data, 'EX', expiration);
-                } else {
-                    pipeline.set(key, data);
-                }
-            });
-            await pipeline.exec();
-            console.log(`Bulk cached ${items.length} items`);
-        } catch (error) {
-            console.error(`Error in bulk caching:`, error);
-        }
-    },
-
-    /**
-     * @param keys
-     * @returns
-     */
-    async getBulk(keys) {
-        try {
-            const results = await redis.mget(keys);
-            return keys.reduce(
-                (acc, key, index) => {
-                    if (results[index]) {
-                        acc[key] = JSON.parse(results[index]!);
-                    }
-                    return acc;
-                },
-                {} as Record<string, any>,
+            const htmlContent = await fs.readFile(
+                path.resolve(__dirname, '..', filePath),
+                'utf-8',
             );
+            await redis.set(key, htmlContent, 'EX', expiration);
+
+            console.log(`Cached HTML page: ${key} (Expires in ${expiration})`);
         } catch (error) {
-            console.error(`Error in bulk fetching:`, error);
-            return {};
+            console.error(`Error caching page ${key}: `, error);
+        }
+    },
+
+    async getCachePage(key: string): Promise<string | null> {
+        try {
+            return await redis.get(key);
+        } catch (error) {
+            console.error(`Error grtching cached page ${key}: `, error);
+            return null;
         }
     },
 };

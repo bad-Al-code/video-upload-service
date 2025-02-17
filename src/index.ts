@@ -2,26 +2,21 @@ import 'dotenv/config';
 import { redis } from './config/db';
 import { cacheService } from './services/cache.service';
 
-async function testCache() {
-    await cacheService.set('A', { name: 'One', age: 10 }, 3600);
-    const ttl = await cacheService.ttl('A');
+async function cacheStaticPage() {
+    const cacheKey = 'page:index';
+    const cachedPage = await cacheService.getCachePage(cacheKey);
 
-    await cacheService.setBulk([
-        { key: 'B', value: { name: 'Two' }, expiration: 1200 },
-        { key: 'C', value: { name: 'Three' }, expiration: 1500 },
-    ]);
-
-    const users = await cacheService.getBulk(['A', 'B', 'C']);
-
-    console.log('Fetched Users: ', users);
-
-    await cacheService.del('A');
+    if (!cachedPage) {
+        console.log('No cached page found. Caching now...');
+        await cacheService.cachePage(cacheKey, 'views/index.html');
+    } else {
+        console.log('Page is already cached');
+    }
 }
-
 async function main() {
     await redis;
 
-    await testCache();
+    cacheStaticPage();
 }
 
 main();
