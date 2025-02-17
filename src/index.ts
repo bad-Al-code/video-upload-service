@@ -4,9 +4,16 @@ import { cacheService } from './services/cache.service';
 
 async function testCache() {
     await cacheService.set('A', { name: 'One', age: 10 }, 3600);
-    const user = await cacheService.get('A');
+    const ttl = await cacheService.ttl('A');
 
-    console.log('Cache: ', user);
+    await cacheService.setBulk([
+        { key: 'B', value: { name: 'Two' }, expiration: 1200 },
+        { key: 'C', value: { name: 'Three' }, expiration: 1500 },
+    ]);
+
+    const users = await cacheService.getBulk(['A', 'B', 'C']);
+
+    console.log('Fetched Users: ', users);
 
     await cacheService.del('A');
 }
