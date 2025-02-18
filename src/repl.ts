@@ -1,4 +1,5 @@
 import { createInterface } from 'node:readline';
+import { getCommands } from './commands';
 
 export function startRepl() {
     const rl = createInterface({
@@ -17,7 +18,18 @@ export function startRepl() {
         }
 
         const commandName = words[0];
-        console.log(`Your command was: ${commandName}`);
+
+        const commands = getCommands();
+        const cmd = commands[commandName];
+        if (!cmd) {
+            console.log(
+                `Unknown command: "${commandName}". Type "help" for a list of commands.`,
+            );
+            rl.prompt();
+            return;
+        }
+
+        cmd.callback(commands);
         rl.prompt();
     });
 }
