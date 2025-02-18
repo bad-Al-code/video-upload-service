@@ -12,7 +12,7 @@
         "test:ci": "vitest --run",
         "test": "vitest",
         "lint": "eslint .",
-        "start": "nodemon src/index.ts"
+        "start": "nodemon src/main.ts"
     },
     "repository": {
         "type": "git",
