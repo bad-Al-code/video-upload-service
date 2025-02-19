@@ -12,8 +12,8 @@
         "test:ci": "vitest --run",
         "test": "vitest",
         "lint": "eslint .",
-        "dev": "npx tsc && node dist/main.js",
-        "start": "node dist/main.js"
+        "dev": "npx tsc && node dist/index.js",
+        "start": "nodemon index.ts"
     },
     "repository": {
         "type": "git",
