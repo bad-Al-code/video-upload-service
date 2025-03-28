@@ -201,3 +201,22 @@ interface Car {
 let carColor: Car['color' | 'year'];
 
 fetchRecord('magazine', 'asdasd');
+
+interface Car {
+  drive: () => void;
+}
+interface Bike {
+  pedal: () => void;
+}
+
+function isCar(vehicle: Car | Bike): vehicle is Car {
+  return (vehicle as Car).drive !== undefined;
+}
+
+function operateVehicle(vehicle: Car | Bike) {
+  if (isCar(vehicle)) {
+    vehicle.drive();
+  } else {
+    vehicle.pedal();
+  }
+}
