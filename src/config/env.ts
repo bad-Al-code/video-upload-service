@@ -3,6 +3,7 @@ import { z } from 'zod';
 
 const envSchema = z.object({
   PORT: z.string().regex(/^\d+$/).transform(Number),
+  MAX_FILE_SIZE_MB: z.number(),
 });
 
 const parsedEnv = envSchema.safeParse(process.env);

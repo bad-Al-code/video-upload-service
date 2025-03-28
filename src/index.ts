@@ -6,12 +6,73 @@ import express, {
   urlencoded,
 } from 'express';
 import { StatusCodes } from 'http-status-codes';
+import { extname, join } from 'node:path';
+import { v4 as uuidv4 } from 'uuid';
+import { existsSync, fstat, mkdirSync } from 'node:fs';
+import multer, { diskStorage, FileFilterCallback, MulterError } from 'multer';
 
 import { ENV } from './config/env';
-import { AppError, InternalServerError } from './errors';
+import { AppError, BadRequestError, InternalServerError } from './errors';
 
 const app = express();
 const PORT = ENV.PORT;
+
+const UPLOAD_DIR = join(__dirname, '..', 'uploads');
+const TEMP_DIR = join(__dirname, '..', 'temp');
+
+if (!existsSync(UPLOAD_DIR)) {
+  mkdirSync(UPLOAD_DIR, { recursive: true });
+  console.log(`Created upload Directory: ${UPLOAD_DIR}`);
+}
+
+if (!existsSync(TEMP_DIR)) {
+  mkdirSync(TEMP_DIR, { recursive: true });
+  console.log(`Created temp directory: ${TEMP_DIR}`);
+}
+
+const storage = diskStorage({
+  destination: (req, file, cb) => {
+    cb(null, UPLOAD_DIR);
+  },
+  filename: (req, file, cb) => {
+    const uniqueSuffix = `${uuidv4()}${extname(file.originalname)}`;
+    cb(null, uniqueSuffix);
+  },
+});
+
+const MAX_FILE_SIZE_MB = ENV.MAX_FILE_SIZE_MB;
+const ALLOWED_VIDEO_TYPES = [
+  'video/mp4',
+  'video/mpeg',
+  'video/quicktime',
+  'video/webm',
+  'video/x-msvideo',
+  'video/x-matroska',
+];
+
+const fileFilter = (
+  req: Request,
+  file: Express.Multer.File,
+  cb: FileFilterCallback,
+) => {
+  if (ALLOWED_VIDEO_TYPES.includes(file.mimetype)) {
+    cb(null, true);
+  } else {
+    cb(
+      new BadRequestError(
+        `Invalid file type. Allowed types: ${ALLOWED_VIDEO_TYPES.join(', ')}`,
+      ),
+    );
+  }
+};
+
+const upload = multer({
+  storage: storage,
+  fileFilter: fileFilter,
+  limits: {
+    fileSize: MAX_FILE_SIZE_MB * 1024 * 1024,
+  },
+});
 
 app.use(json());
 app.use(urlencoded({ extended: true }));
@@ -24,20 +85,33 @@ app.use((err: Error, req: Request, res: Response, next: NextFunction) => {
   console.error('Unhandler error: ', err);
 
   let statusCode: StatusCodes = StatusCodes.INTERNAL_SERVER_ERROR;
-  let message: string = 'Something went wrong';
+  let responseBody: any = {
+    status: 'error',
+    message: 'Something went wrong',
+  };
 
-  if (err instanceof AppError) {
+  if (err instanceof MulterError) {
+    if (err.code === 'LIMIT_FILE_SIZE') {
+      statusCode = StatusCodes.BAD_REQUEST;
+      responseBody.message = `File too large. Maximum size is ${MAX_FILE_SIZE_MB}MB.`;
+    } else {
+      statusCode = StatusCodes.BAD_REQUEST;
+      responseBody.message = `File upload error: ${err.message}`;
+    }
+  } else if (err instanceof AppError) {
     statusCode = err.statusCode;
-    message = err.message;
+    responseBody.message = err.message;
   } else {
     const internalError = new InternalServerError(
       err.message || 'An unexpected error occured',
     );
     statusCode = internalError.statusCode;
-    message = internalError.message;
+    responseBody.message = internalError.message;
   }
 
-  res.status(statusCode).json({ status: 'error', statusCode, message });
+  responseBody.statusCode = statusCode;
+
+  res.status(statusCode).json(responseBody);
 });
 
 app.listen(PORT, () => {
