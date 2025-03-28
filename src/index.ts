@@ -6,68 +6,21 @@ import express, {
   urlencoded,
 } from 'express';
 import { StatusCodes } from 'http-status-codes';
-import { extname, join } from 'node:path';
-import { v4 as uuidv4 } from 'uuid';
-import multer, { diskStorage, FileFilterCallback, MulterError } from 'multer';
+import { join } from 'node:path';
 import { rename, unlink } from 'node:fs/promises';
 
 import { ENV } from './config/env';
 import { AppError, BadRequestError, InternalServerError } from './errors';
 import { ensureDirectoryExists } from './utils/fsUtils';
-import {
-  ALLOWED_VIDEO_TYPES,
-  ALLOWED_EXTENSIONS,
-  MAX_FILE_SIZE_MB,
-  TEMP_DIR,
-  UPLOAD_DIR,
-} from './config/constants';
+import { MAX_FILE_SIZE_MB, TEMP_DIR, UPLOAD_DIR } from './config/constants';
+import { upload } from './config/multer';
+import { MulterError } from 'multer';
 
 const app = express();
 const PORT = ENV.PORT;
 
 ensureDirectoryExists(UPLOAD_DIR);
 ensureDirectoryExists(TEMP_DIR);
-
-const storage = diskStorage({
-  destination: (req, file, cb) => {
-    cb(null, UPLOAD_DIR);
-  },
-  filename: (req, file, cb) => {
-    const uniqueSuffix = `${uuidv4()}${extname(file.originalname)}`;
-    cb(null, uniqueSuffix);
-  },
-});
-
-const fileFilter = (
-  req: Request,
-  file: Express.Multer.File,
-  cb: FileFilterCallback,
-) => {
-  const fileExtension = extname(file.originalname).toLowerCase();
-  const isMimeTypeAllowed = ALLOWED_VIDEO_TYPES.includes(file.mimetype);
-  const isExtensionAllowed = ALLOWED_EXTENSIONS.includes(fileExtension);
-
-  if (
-    isMimeTypeAllowed ||
-    (file.mimetype === 'application/octet-stream' && isExtensionAllowed)
-  ) {
-    cb(null, true);
-  } else {
-    cb(
-      new BadRequestError(
-        `Invalid file type. Allowed types: ${ALLOWED_VIDEO_TYPES.join(', ')}`,
-      ),
-    );
-  }
-};
-
-const upload = multer({
-  storage: storage,
-  fileFilter: fileFilter,
-  limits: {
-    fileSize: MAX_FILE_SIZE_MB * 1024 * 1024,
-  },
-});
 
 app.use(json());
 app.use(urlencoded({ extended: true }));
