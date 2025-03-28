@@ -1,3 +1,5 @@
+import { error } from 'console';
+
 interface Car {
   make: string;
   model: string;
@@ -71,4 +73,44 @@ if (second instanceof Error) {
   second;
 } else {
   second;
+}
+
+/**
+ * Types:
+ *  - defines a more meanigful name for this type
+ *  - decalre the sha[pe of the type in a single place
+ *  - import and exprt this type from modules, the same as if it were an importable/exportable value
+ */
+
+type Amount = { currency: string; value: number };
+
+function printAmount(amt: Amount) {
+  console.log(amt);
+
+  const { currency, value } = amt;
+  console.log(`${currency} : ${value}`);
+}
+
+const donation = {
+  currency: 'INR',
+  value: 120,
+  description: "I have't decided yet",
+};
+
+printAmount(donation);
+
+type UserInfoOutcomeError = readonly ['error', Error];
+type UserInfoOutcomeSuccess = readonly [
+  'success',
+  { readonly name: string; readonly email: string },
+];
+
+type UserInfoOutCome = UserInfoOutcomeError | UserInfoOutcomeSuccess;
+
+function maybeGetUserInfo2(): UserInfoOutCome {
+  if (flipCoins() === 'heads') {
+    return success;
+  } else {
+    return fail;
+  }
 }
