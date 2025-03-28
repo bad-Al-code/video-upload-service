@@ -8,19 +8,22 @@ import express, {
 import { StatusCodes } from 'http-status-codes';
 import { extname, join } from 'node:path';
 import { v4 as uuidv4 } from 'uuid';
-import { existsSync, fstat, mkdirSync } from 'node:fs';
 import multer, { diskStorage, FileFilterCallback, MulterError } from 'multer';
+import { rename, unlink } from 'node:fs/promises';
 
 import { ENV } from './config/env';
 import { AppError, BadRequestError, InternalServerError } from './errors';
-import { rename, unlink } from 'node:fs/promises';
 import { ensureDirectoryExists } from './utils/fsUtils';
+import {
+  ALLOWED_VIDEO_TYPES,
+  ALLOWED_EXTENSIONS,
+  MAX_FILE_SIZE_MB,
+  TEMP_DIR,
+  UPLOAD_DIR,
+} from './config/constants';
 
 const app = express();
 const PORT = ENV.PORT;
-
-const UPLOAD_DIR = join(__dirname, '..', 'uploads');
-const TEMP_DIR = join(__dirname, '..', 'temp');
 
 ensureDirectoryExists(UPLOAD_DIR);
 ensureDirectoryExists(TEMP_DIR);
@@ -34,17 +37,6 @@ const storage = diskStorage({
     cb(null, uniqueSuffix);
   },
 });
-
-const MAX_FILE_SIZE_MB = ENV.MAX_FILE_SIZE_MB;
-const ALLOWED_EXTENSIONS = ['.mp4', '.mpeg', '.mov', '.webm', '.avi', '.mkv'];
-const ALLOWED_VIDEO_TYPES = [
-  'video/mp4',
-  'video/mpeg',
-  'video/quicktime',
-  'video/webm',
-  'video/x-msvideo',
-  'video/x-matroska',
-];
 
 const fileFilter = (
   req: Request,
