@@ -136,3 +136,5 @@ dist
 .pnp.*
 uploads/
 temp
+mysql-data/
+my_video.mp4
