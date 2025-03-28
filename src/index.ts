@@ -1,4 +1,5 @@
 import { error } from 'console';
+import { consumers } from 'stream';
 
 interface Car {
   make: string;
@@ -112,5 +113,59 @@ function maybeGetUserInfo2(): UserInfoOutCome {
     return success;
   } else {
     return fail;
+  }
+}
+
+/** Interface */
+interface Animal {
+  isAlive(): boolean;
+}
+interface Mammel extends Animal {
+  getFurOrHairColor(): string;
+}
+interface Hamster extends Mammel {
+  squeak(): string;
+}
+
+function careForHamster(h: Hamster) {
+  h.getFurOrHairColor();
+  h.squeak();
+}
+
+interface AnimalLike {
+  eat(food): void;
+}
+
+function consumeFood(food) {}
+
+class Dog implements AnimalLike {
+  eat() {
+    consumeFood(food);
+  }
+  bark() {
+    return 'woof';
+  }
+}
+
+class LivingOrganism {
+  isAlive() {
+    return true;
+  }
+}
+
+interface AnimalLike {
+  eat(food): void;
+}
+
+interface CanBark {
+  bark(): string;
+}
+
+class Dog2 extends LivingOrganism implements AnimalLike, CanBark {
+  eat(food) {
+    consumeFood(food);
+  }
+  bark(): string {
+    return 'woof';
   }
 }
