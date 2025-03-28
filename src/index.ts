@@ -126,7 +126,7 @@ app.post('/upload/video', (req: Request, res: Response, next: NextFunction) => {
     }
 
     const sourcePath = req.file.path;
-    const destinationFilename = req.file.fieldname;
+    const destinationFilename = req.file.filename;
     const destinationPath = join(TEMP_DIR, destinationFilename);
 
     console.log(
