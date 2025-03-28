@@ -12,12 +12,14 @@ const envSchema = z.object({
   DB_PASSWORD: z.string().min(1, 'DB_PASSWORD is required'),
   DB_ROOT_PASSWORD: z.string().min(1, 'DB_ROOT_PASSWORD is required'),
 
-  DATABASE_URL: z.string().url('DATABASE_URL must be a valid URL'),
+  DATABASE_URL: z.string(),
 });
 
 const parsedEnv = envSchema.safeParse(process.env);
 
 if (!parsedEnv.success) {
+  console.error('Invalid Environment Variables:', parsedEnv.error.format());
+
   throw new Error(`Invalid Environment Variables: ${parsedEnv.error.format()}`);
 }
 
