@@ -14,6 +14,7 @@ import multer, { diskStorage, FileFilterCallback, MulterError } from 'multer';
 import { ENV } from './config/env';
 import { AppError, BadRequestError, InternalServerError } from './errors';
 import { rename, unlink } from 'node:fs/promises';
+import { ensureDirectoryExists } from './utils/fsUtils';
 
 const app = express();
 const PORT = ENV.PORT;
@@ -21,15 +22,8 @@ const PORT = ENV.PORT;
 const UPLOAD_DIR = join(__dirname, '..', 'uploads');
 const TEMP_DIR = join(__dirname, '..', 'temp');
 
-if (!existsSync(UPLOAD_DIR)) {
-  mkdirSync(UPLOAD_DIR, { recursive: true });
-  console.log(`Created upload Directory: ${UPLOAD_DIR}`);
-}
-
-if (!existsSync(TEMP_DIR)) {
-  mkdirSync(TEMP_DIR, { recursive: true });
-  console.log(`Created temp directory: ${TEMP_DIR}`);
-}
+ensureDirectoryExists(UPLOAD_DIR);
+ensureDirectoryExists(TEMP_DIR);
 
 const storage = diskStorage({
   destination: (req, file, cb) => {
@@ -85,10 +79,6 @@ const upload = multer({
 
 app.use(json());
 app.use(urlencoded({ extended: true }));
-
-app.get('/ping', (req: Request, res: Response) => {
-  res.status(StatusCodes.OK).json({ message: 'Pong' });
-});
 
 app.post('/upload/video', (req: Request, res: Response, next: NextFunction) => {
   const uploader = upload.single('videoFile');
@@ -190,5 +180,5 @@ app.use((err: Error, req: Request, res: Response, next: NextFunction) => {
 });
 
 app.listen(PORT, () => {
-  console.log(`Server is running on http://localhost"${PORT}`);
+  console.log(`Server is running on http://localhost:${PORT}`);
 });
