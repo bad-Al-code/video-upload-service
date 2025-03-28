@@ -57,12 +57,7 @@ const fileFilter = (
   file: Express.Multer.File,
   cb: FileFilterCallback,
 ) => {
-  console.log(
-    `DEBUG: Detected file mimetype for ${file.originalname}: ${file.mimetype}`,
-  );
   const fileExtension = extname(file.originalname).toLowerCase();
-  console.log(`DEBUG: Detected file extension: ${fileExtension}`);
-
   const isMimeTypeAllowed = ALLOWED_VIDEO_TYPES.includes(file.mimetype);
   const isExtensionAllowed = ALLOWED_EXTENSIONS.includes(fileExtension);
 
@@ -70,15 +65,8 @@ const fileFilter = (
     isMimeTypeAllowed ||
     (file.mimetype === 'application/octet-stream' && isExtensionAllowed)
   ) {
-    console.log(
-      `Accepting file: Mime allowed: ${isMimeTypeAllowed}, Ext allowed: ${isExtensionAllowed}`,
-    );
     cb(null, true);
   } else {
-    console.error(
-      `Rejected file: Mime type '${file.mimetype}', Extension: '${fileExtension}'. Allowed types: ${ALLOWED_VIDEO_TYPES.join(', ')}, Allowed Extenstions: ${ALLOWED_EXTENSIONS.join(', ')}`,
-    );
-
     cb(
       new BadRequestError(
         `Invalid file type. Allowed types: ${ALLOWED_VIDEO_TYPES.join(', ')}`,
