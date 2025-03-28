@@ -1,33 +1,53 @@
-import express, {
-  json,
-  NextFunction,
-  Request,
-  Response,
-  urlencoded,
-} from 'express';
+import { createServer } from 'node:http';
 
-import { NotFoundError } from './errors';
-import { ensureDirectoryExists } from './utils/fsUtils';
-import { TEMP_DIR, UPLOAD_DIR } from './config/constants';
-import { globalErrorHandler } from './middleware/errorHandler.middleware';
-import mainRouter from './routes';
+import { ENV } from './config/env';
+import { app } from './app';
 
-const app = express();
+const PORT = ENV.PORT;
 
-ensureDirectoryExists(UPLOAD_DIR);
-ensureDirectoryExists(TEMP_DIR);
+const server = createServer(app);
 
-app.use(json());
-app.use(urlencoded({ extended: true }));
+server.on('error', (error: NodeJS.ErrnoException) => {
+  if (error.syscall !== 'listen') {
+    throw error;
+  }
 
-app.use('/api/v1', mainRouter);
-
-app.use((req: Request, res: Response, next: NextFunction) => {
-  next(new NotFoundError(`Route not found: ${req.method} ${req.originalUrl}`));
+  const bind = typeof PORT === 'string' ? 'Pipe ' + PORT : 'Port ' + PORT;
+  switch (error.code) {
+    case 'EACCES':
+      console.error(`${bind} requires elevated privileges`);
+      process.exit(1);
+      break;
+    case 'EADDRINUSE':
+      console.error(`${bind} is already in use`);
+      process.exit(1);
+      break;
+    default:
+      throw error;
+  }
 });
 
-app.use(globalErrorHandler);
+server.listen(PORT, () => {
+  console.log(`   Server ready and listening on http://localhost:${PORT}`);
+  console.log(`   API base path: /api/v1`);
+  console.log(`   Upload endpoint: POST /api/v1/upload/video`);
+});
 
-app.listen(3000);
+const signals: NodeJS.Signals[] = ['SIGINT', 'SIGTERM'];
 
-export { app };
+signals.forEach((signal) => {
+  process.on(signal, () => {
+    console.log(`\nReceived ${signal}. Shutting down gracefully...`);
+    server.close(() => {
+      console.log('HTTP server closed.');
+      process.exit(0);
+    });
+
+    setTimeout(() => {
+      console.error(
+        'Could not close connections in time, forcefully shutting down',
+      );
+      process.exit(1);
+    }, 10000);
+  });
+});
