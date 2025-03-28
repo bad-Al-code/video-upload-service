@@ -5,6 +5,9 @@ import express, {
   Response,
   urlencoded,
 } from 'express';
+import cors from 'cors';
+import helmet from 'helmet';
+import morgan from 'morgan';
 
 import { NotFoundError } from './errors';
 import { ensureDirectoryExists } from './utils/fsUtils';
@@ -17,6 +20,9 @@ const app = express();
 ensureDirectoryExists(UPLOAD_DIR);
 ensureDirectoryExists(TEMP_DIR);
 
+app.use(cors());
+app.use(helmet());
+app.use(morgan('dev'));
 app.use(json());
 app.use(urlencoded({ extended: true }));
 
