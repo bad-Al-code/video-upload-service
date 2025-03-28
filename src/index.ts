@@ -15,6 +15,7 @@ import { ensureDirectoryExists } from './utils/fsUtils';
 import { MAX_FILE_SIZE_MB, TEMP_DIR, UPLOAD_DIR } from './config/constants';
 import { upload } from './config/multer';
 import { MulterError } from 'multer';
+import { globalErrorHandler } from './middleware/errorHandler.middleware';
 
 const app = express();
 const PORT = ENV.PORT;
@@ -91,38 +92,7 @@ app.post('/upload/video', (req: Request, res: Response, next: NextFunction) => {
   });
 });
 
-app.use((err: Error, req: Request, res: Response, next: NextFunction) => {
-  console.error('Unhandler error: ', err);
-
-  let statusCode: StatusCodes = StatusCodes.INTERNAL_SERVER_ERROR;
-  let responseBody: any = {
-    status: 'error',
-    message: 'Something went wrong',
-  };
-
-  if (err instanceof MulterError) {
-    if (err.code === 'LIMIT_FILE_SIZE') {
-      statusCode = StatusCodes.BAD_REQUEST;
-      responseBody.message = `File too large. Maximum size is ${MAX_FILE_SIZE_MB}MB.`;
-    } else {
-      statusCode = StatusCodes.BAD_REQUEST;
-      responseBody.message = `File upload error: ${err.message}`;
-    }
-  } else if (err instanceof AppError) {
-    statusCode = err.statusCode;
-    responseBody.message = err.message;
-  } else {
-    const internalError = new InternalServerError(
-      err.message || 'An unexpected error occured',
-    );
-    statusCode = internalError.statusCode;
-    responseBody.message = internalError.message;
-  }
-
-  responseBody.statusCode = statusCode;
-
-  res.status(statusCode).json(responseBody);
-});
+app.use(globalErrorHandler);
 
 app.listen(PORT, () => {
   console.log(`Server is running on http://localhost:${PORT}`);
