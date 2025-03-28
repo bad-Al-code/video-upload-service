@@ -1,5 +1,7 @@
 import { error } from 'console';
 import { consumers } from 'stream';
+import { promise } from 'zod';
+import { fetchRecord } from './lib/registry';
 
 interface Car {
   make: string;
@@ -169,3 +171,33 @@ class Dog2 extends LivingOrganism implements AnimalLike, CanBark {
     return 'woof';
   }
 }
+
+type DatePropertyNames = keyof Date;
+
+async function main() {
+  const apiResponse = await Promise.all([
+    fetch('https://google.com'),
+    Promise.resolve('Google'),
+  ]);
+
+  type ApiResponseType = typeof apiResponse;
+}
+
+const MyAjaxConstructor = CSSRule;
+CSSRule.STYLE_RULE;
+const myAjax = new CSSRule();
+
+interface Car {
+  make: string;
+  model: string;
+  year: number;
+  color: {
+    red: string;
+    green: string;
+    blue: string;
+  };
+}
+
+let carColor: Car['color' | 'year'];
+
+fetchRecord('magazine', 'asdasd');
