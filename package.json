@@ -3,17 +3,17 @@
   "version": "1.0.0",
   "main": "index.js",
   "scripts": {
-    "build": "tsc",
-    "format": "prettier . --write",
+    "build": "npx tsc",
+    "format": "npx prettier . --write",
     "format:check": "prettier '**/*.ts' --check",
     "prepare": "if [ \"$NODE_ENV\" != \"production\" ]; then husky install; fi",
-    "test:coverage": "vitest --coverage",
-    "test:ui": "vitest --ui",
-    "test:ci": "vitest --run",
-    "test": "vitest",
-    "lint": "eslint .",
+    "test:coverage": "npx vitest --coverage",
+    "test:ui": "npx vitest --ui",
+    "test:ci": "npx vitest --run",
+    "test": "npx vitest",
+    "lint": "npx eslint .",
     "dev": "npx tsc && node dist/index.js",
-    "start": "nodemon index.ts"
+    "start": "npx nodemon index.ts"
   },
   "repository": {
     "type": "git",
@@ -21,7 +21,7 @@
   },
   "keywords": [],
   "author": "",
-  "license": "ISC",
+  "license": "MIT",
   "bugs": {
     "url": "https://github.com/bad-Al-code/TypeScript/issues"
   },
