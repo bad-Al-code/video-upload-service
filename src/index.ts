@@ -8,6 +8,7 @@ import express, {
 import { StatusCodes } from 'http-status-codes';
 
 import { ENV } from './config/env';
+import { AppError, InternalServerError } from './errors';
 
 const app = express();
 const PORT = ENV.PORT;
@@ -21,9 +22,22 @@ app.get('/ping', (req: Request, res: Response) => {
 
 app.use((err: Error, req: Request, res: Response, next: NextFunction) => {
   console.error('Unhandler error: ', err);
-  res
-    .status(StatusCodes.INTERNAL_SERVER_ERROR)
-    .json({ message: 'Something went wrong!', error: err.message });
+
+  let statusCode: StatusCodes = StatusCodes.INTERNAL_SERVER_ERROR;
+  let message: string = 'Something went wrong';
+
+  if (err instanceof AppError) {
+    statusCode = err.statusCode;
+    message = err.message;
+  } else {
+    const internalError = new InternalServerError(
+      err.message || 'An unexpected error occured',
+    );
+    statusCode = internalError.statusCode;
+    message = internalError.message;
+  }
+
+  res.status(statusCode).json({ status: 'error', statusCode, message });
 });
 
 app.listen(PORT, () => {
