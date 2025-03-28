@@ -13,6 +13,7 @@ import multer, { diskStorage, FileFilterCallback, MulterError } from 'multer';
 
 import { ENV } from './config/env';
 import { AppError, BadRequestError, InternalServerError } from './errors';
+import { rename, unlink } from 'node:fs/promises';
 
 const app = express();
 const PORT = ENV.PORT;
@@ -79,6 +80,72 @@ app.use(urlencoded({ extended: true }));
 
 app.get('/ping', (req: Request, res: Response) => {
   res.status(StatusCodes.OK).json({ message: 'Pong' });
+});
+
+app.post('/upload/video', (req: Request, res: Response, next: NextFunction) => {
+  const uploader = upload.single('videoFile');
+
+  uploader(req, res, async (err: any) => {
+    if (err instanceof MulterError) {
+      return next(err);
+    } else if (err instanceof AppError) {
+      return next(err);
+    } else if (err) {
+      console.error('Unexpected error during upload middleware: ', err);
+      return next(
+        new InternalServerError('Failed during file upload processing.'),
+      );
+    }
+
+    if (!req.file) {
+      return next(
+        new BadRequestError(
+          'No video file uploaded. Ensure the field name is "videoFile".',
+        ),
+      );
+    }
+
+    const sourcePath = req.file.path;
+    const destinationFilename = req.file.fieldname;
+    const destinationPath = join(TEMP_DIR, destinationFilename);
+
+    console.log(
+      `Receieved File: ${req.file.originalname} (${req.file.mimetype})`,
+    );
+    console.log(`Temporary location (Multer): ${sourcePath}`);
+    console.log(`Final temporary location planned: ${destinationPath}`);
+
+    try {
+      await rename(sourcePath, destinationPath);
+      console.log(`Successfully moved file to ${destinationPath}`);
+
+      res.status(StatusCodes.OK).json({
+        message: 'video uploaded successfully.',
+        tempFilename: destinationFilename,
+      });
+    } catch (moveError: any) {
+      console.error(
+        `Failed to move file from ${sourcePath} to ${destinationPath}: `,
+        moveError,
+      );
+
+      try {
+        await unlink(sourcePath);
+        console.log(`Cleaned up temporary multer file: ${sourcePath}`);
+      } catch (cleanupError: any) {
+        console.error(
+          `Failed tp cleanup multer file ${sourcePath}: `,
+          cleanupError,
+        );
+      }
+
+      return next(
+        new InternalServerError(
+          'Failed to process and store the uploaded video.',
+        ),
+      );
+    }
+  });
 });
 
 app.use((err: Error, req: Request, res: Response, next: NextFunction) => {
