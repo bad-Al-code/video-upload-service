@@ -6,6 +6,7 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
+    image: video-upload-service:compose-dev
     restart: unless-stopped
     ports:
       - '${PORT:-3000}:${PORT:-3000}'

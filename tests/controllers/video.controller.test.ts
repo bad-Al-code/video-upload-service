@@ -2,7 +2,6 @@ import request from 'supertest';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { Readable } from 'stream';
 import { StatusCodes } from 'http-status-codes';
-import { mock } from 'node:test';
 
 vi.mock('../../src/config/env', () => ({
   ENV: {
