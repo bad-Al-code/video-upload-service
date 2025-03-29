@@ -23,8 +23,8 @@ services:
       AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID:?err_aws_access_key_id_not_set}
       AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY:?err_aws_secret_access_key_not_set}
     volumes:
-      - ./src:/app/src
-      - ./tsconfig.json:/app/tsconfig.json
+      - .:/app
+      # - ./tsconfig.json:/app/tsconfig.json
       - /app/node_modules
     depends_on:
       mysql:
