@@ -268,6 +268,6 @@ export const getVideoDetails = async (
       error,
     );
 
-    return next(new InternalServerError(`Failed to retrieve video detauls.`));
+    return next(new InternalServerError(`Failed to retrieve video details.`));
   }
 };

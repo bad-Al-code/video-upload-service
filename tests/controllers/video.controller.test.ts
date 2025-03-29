@@ -2,6 +2,7 @@ import request from 'supertest';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { Readable } from 'stream';
 import { StatusCodes } from 'http-status-codes';
+import { mock } from 'node:test';
 
 vi.mock('../../src/config/env', () => ({
   ENV: {
@@ -18,6 +19,9 @@ const mockDb = {
   update: vi.fn().mockReturnThis(),
   set: vi.fn().mockReturnThis(),
   where: vi.fn().mockResolvedValue(undefined),
+  limit: vi.fn().mockResolvedValue([]),
+  select: vi.fn().mockReturnThis(),
+  from: vi.fn().mockReturnThis(),
 };
 vi.mock('../../src/db', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../../src/db')>();
@@ -240,5 +244,106 @@ describe('Video Upload Controller - POST /api/v1/upload/video', () => {
 
     expect(mockFsPromises.stat).toHaveBeenCalledOnce();
     expect(mockFsPromises.unlink).toHaveBeenCalledOnce();
+  });
+});
+
+describe('Video Details Controller - GET /api/v1/upload/videos/:videoId', () => {
+  const agent = request(app);
+  const MOCK_VALID_UUID = '26a42e24-1d4e-4679-875d-9ed80a0d43da';
+  const MOCK_OTHER_UUID = 'ea6f2864-1b28-4c45-8cd3-d9b892b01a59';
+  const MOCK_INVALID_ID_FORMAT = 'dummy-id';
+  const MOCK_VIDEO_DATA = {
+    id: MOCK_VALID_UUID,
+    orignalFilename: 'found-video.mp4',
+    mimeType: 'video/mp4',
+    sizeByte: 3398683,
+    status: 'READY',
+    title: 'Found Video Title',
+    description: 'A video description',
+    durationSeconds: 120,
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+  };
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+
+    mockDb.select.mockClear().mockReturnThis();
+    mockDb.from.mockClear().mockReturnThis();
+    mockDb.where.mockClear().mockReturnThis();
+    mockDb.limit.mockClear().mockResolvedValue([]);
+  });
+
+  it('should return 400 Bad Request if videoId is not a valid UUID', async () => {
+    const response = await agent.get(
+      `/api/v1/upload/videos/${MOCK_INVALID_ID_FORMAT}`,
+    );
+
+    expect(response.status).toBe(StatusCodes.BAD_REQUEST);
+    expect(response.body.message).toMatch(/invalid request parameter/i);
+    expect(response.body.message).toMatch(/invalid video id format/i);
+    expect(mockDb.select).not.toHaveBeenCalled();
+  });
+
+  it('should return 404 Not Found if video with valid UUID does not exist', async () => {
+    mockDb.limit.mockResolvedValueOnce([]);
+
+    const response = await agent.get(
+      `/api/v1/upload/videos/${MOCK_OTHER_UUID}`,
+    );
+
+    expect(response.status).toBe(StatusCodes.NOT_FOUND);
+    expect(response.body.message).toContain('Video with ID');
+    expect(response.body.message).toContain('not found');
+
+    expect(mockDb.select).toHaveBeenCalledOnce();
+    expect(mockDb.where).toHaveBeenCalledOnce();
+    expect(mockDb.limit).toHaveBeenCalledOnce();
+  });
+
+  it('should return 200 OK with video details if video exists', async () => {
+    const mockDataWithISODates = {
+      ...MOCK_VIDEO_DATA,
+      createdAt: new Date(MOCK_VIDEO_DATA.createdAt),
+      updatedAt: new Date(MOCK_VIDEO_DATA.updatedAt),
+    };
+
+    mockDb.limit.mockResolvedValueOnce([mockDataWithISODates]);
+
+    const response = await agent.get(
+      `/api/v1/upload/videos/${MOCK_VALID_UUID}`,
+    );
+
+    expect(response.status).toBe(StatusCodes.OK);
+    expect(response.body.message).toContain(
+      'Video details retrived successfully',
+    );
+    expect(response.body.data).toEqual(
+      expect.objectContaining({
+        ...MOCK_VIDEO_DATA,
+        createdAt: MOCK_VIDEO_DATA.createdAt,
+        updatedAt: MOCK_VIDEO_DATA.updatedAt,
+      }),
+    );
+
+    expect(mockDb.select).toHaveBeenCalledOnce();
+    expect(mockDb.where).toHaveBeenCalledOnce();
+    expect(mockDb.limit).toHaveBeenCalledOnce();
+  });
+
+  it('should return 500 Internal Server Error if database query fails', async () => {
+    const dbQueryError = new Error('Unexpected DB connection error');
+    mockDb.limit.mockRejectedValueOnce(dbQueryError);
+
+    const response = await agent.get(
+      `/api/v1/upload/videos/${MOCK_VALID_UUID}`,
+    );
+
+    expect(response.status).toBe(StatusCodes.INTERNAL_SERVER_ERROR);
+    expect(response.body.message).toContain('Failed to retrieve video details');
+
+    expect(mockDb.select).toHaveBeenCalledOnce();
+    expect(mockDb.where).toHaveBeenCalledOnce();
+    expect(mockDb.limit).toHaveBeenCalledOnce();
   });
 });
