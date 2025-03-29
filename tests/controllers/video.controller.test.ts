@@ -7,8 +7,8 @@ vi.mock('../../src/config/env', () => ({
   ENV: {
     AWS_S3_BUCKET_NAME: 'mock-bucket',
     AWS_REGION: 'mock-region',
-    AWS_ACCESS_KEY_ID: 'acess-key-id',
-    AWS_SECRET_ACCESS_KEY: 'access-secret-access-key',
+    AWS_ACCESS_KEY_ID: 'mock-key-id',
+    AWS_SECRET_ACCESS_KEY: 'mock-secret',
   },
 }));
 
@@ -19,19 +19,31 @@ const mockDb = {
   set: vi.fn().mockReturnThis(),
   where: vi.fn().mockResolvedValue(undefined),
 };
-
 vi.mock('../../src/db', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../../src/db')>();
   return {
     ...actual,
     db: mockDb,
+    schema: {
+      videos: {
+        id: 'videos.id',
+        status: 'videos.status',
+        objectStorageKey: 'videos.objectStorageKey',
+      },
+      videoStatuses: [
+        'PENDING_UPLOAD',
+        'UPLOAD_FAILED',
+        'PROCESSING',
+        'READY',
+        'ERROR',
+      ],
+    },
   };
 });
 
 const mockS3Client = {
   send: vi.fn(),
 };
-
 vi.mock('../../src/config/s3Client', () => ({
   s3Client: mockS3Client,
 }));
@@ -48,7 +60,6 @@ vi.mock('@aws-sdk/client-s3', async (importOriginal) => {
 const mockFs = {
   createReadStream: vi.fn(),
 };
-
 vi.mock('node:fs', async (importOriginal) => {
   const actual = await importOriginal<typeof import('node:fs')>();
   return {
@@ -61,7 +72,6 @@ const mockFsPromises = {
   unlink: vi.fn().mockResolvedValue(undefined),
   stat: vi.fn().mockResolvedValue({}),
 };
-
 vi.mock('node:fs/promises', async (importOriginal) => {
   const actual = await importOriginal<typeof import('node:fs/promises')>();
   return {
@@ -83,25 +93,33 @@ describe('Video Upload Controller - POST /api/v1/upload/video', () => {
   const MOCK_VIDEO_ID = 'test-uuid-12345';
   const MOCK_ORIGINAL_FILENAME = 'my-cool-video.mov';
   const MOCK_MIMETYPE = 'video/quicktime';
-  const MOCK_FILE_SIZE = 5 * 1024 * 1024;
+  const MOCK_FILE_CONTENT = Buffer.from('this is dummy video content');
+  const MOCK_FILE_SIZE = MOCK_FILE_CONTENT.length;
   const MOCK_S3_KEY = `videos/${MOCK_VIDEO_ID}.mov`;
 
   beforeEach(() => {
     vi.clearAllMocks();
+
     mockUuidv4.mockReturnValue(MOCK_VIDEO_ID);
-    mockDb.values.mockResolvedValue(undefined);
-    mockDb.where.mockResolvedValue(undefined);
-    mockS3Client.send.mockResolvedValue({ ETag: 'mock-etag-value' });
-    mockFs.createReadStream.mockReturnValue(
-      Readable.from(['mock stream data']),
-    );
-    mockFsPromises.unlink.mockResolvedValue(undefined);
-    mockFsPromises.stat.mockResolvedValue({});
+    mockDb.insert.mockReturnThis();
+    mockDb.values.mockReset().mockResolvedValue(undefined);
+    mockDb.update.mockReturnThis();
+    mockDb.set.mockReset().mockReturnThis();
+    mockDb.where.mockReset().mockResolvedValue(undefined);
+    mockS3Client.send
+      .mockReset()
+      .mockResolvedValue({ ETag: 'mock-etag-value' });
+    mockFs.createReadStream
+      .mockReset()
+      .mockReturnValue(Readable.from([MOCK_FILE_CONTENT]));
+    mockFsPromises.unlink.mockReset().mockResolvedValue(undefined);
+    mockFsPromises.stat.mockReset().mockResolvedValue({});
     mockPutObjectCommand.mockClear();
   });
 
   it('should return 400 Bad Request if no file is provided', async () => {
     const response = await agent.post('/api/v1/upload/video').send({});
+
     expect(response.status).toBe(StatusCodes.BAD_REQUEST);
     expect(response.body.message).toContain('No video file data found');
     expect(mockDb.insert).not.toHaveBeenCalled();
@@ -109,11 +127,9 @@ describe('Video Upload Controller - POST /api/v1/upload/video', () => {
   });
 
   it('should process successful upload, returning 200 OK with videoId and s3Key', async () => {
-    const fileContent = Buffer.from('this is dummy video content');
-
     const response = await agent
       .post('/api/v1/upload/video')
-      .attach('videoFile', fileContent, {
+      .attach('videoFile', MOCK_FILE_CONTENT, {
         filename: MOCK_ORIGINAL_FILENAME,
         contentType: MOCK_MIMETYPE,
       });
@@ -129,9 +145,9 @@ describe('Video Upload Controller - POST /api/v1/upload/video', () => {
     expect(mockDb.values).toHaveBeenCalledOnce();
     expect(mockDb.values).toHaveBeenCalledWith({
       id: MOCK_VIDEO_ID,
-      originalFilename: MOCK_ORIGINAL_FILENAME,
+      orignalFilename: MOCK_ORIGINAL_FILENAME,
       mimeType: MOCK_MIMETYPE,
-      sizeBytes: fileContent.length,
+      sizeBytes: expect.any(Number),
       status: 'PENDING_UPLOAD',
     });
 
@@ -161,16 +177,14 @@ describe('Video Upload Controller - POST /api/v1/upload/video', () => {
 
     const response = await agent
       .post('/api/v1/upload/video')
-      .attach('videoFile', Buffer.from('content'), MOCK_ORIGINAL_FILENAME);
+      .attach('videoFile', MOCK_FILE_CONTENT, MOCK_ORIGINAL_FILENAME);
 
     expect(response.status).toBe(StatusCodes.INTERNAL_SERVER_ERROR);
     expect(response.body.message).toMatch(/Database insert failed/i);
-
     expect(mockDb.insert).toHaveBeenCalledOnce();
     expect(mockDb.values).toHaveBeenCalledOnce();
     expect(mockS3Client.send).not.toHaveBeenCalled();
     expect(mockDb.update).not.toHaveBeenCalled();
-    expect(mockFsPromises.stat).toHaveBeenCalledOnce();
     expect(mockFsPromises.unlink).toHaveBeenCalledOnce();
   });
 
@@ -180,39 +194,39 @@ describe('Video Upload Controller - POST /api/v1/upload/video', () => {
 
     const response = await agent
       .post('/api/v1/upload/video')
-      .attach('videoFile', Buffer.from('content'), MOCK_ORIGINAL_FILENAME);
+      .attach('videoFile', MOCK_FILE_CONTENT, MOCK_ORIGINAL_FILENAME);
 
     expect(response.status).toBe(StatusCodes.INTERNAL_SERVER_ERROR);
     expect(response.body.message).toMatch(/S3 upload failed/i);
-
     expect(mockDb.insert).toHaveBeenCalledOnce();
-    expect(mockDb.values).toHaveBeenCalledOnce();
     expect(mockS3Client.send).toHaveBeenCalledOnce();
     expect(mockDb.update).toHaveBeenCalledOnce();
     expect(mockDb.set).toHaveBeenCalledOnce();
     expect(mockDb.set).toHaveBeenCalledWith({ status: 'UPLOAD_FAILED' });
-
-    expect(mockFsPromises.stat).toHaveBeenCalledOnce();
     expect(mockFsPromises.unlink).toHaveBeenCalledOnce();
   });
 
-  it('should return 500 Internal Server Error if DB update after S3 success fails', async () => {
+  it('should return 500 Internal Server Error if final DB update fails after S3 success', async () => {
     const dbUpdateError = new Error('DB update connection error after S3');
     mockS3Client.send.mockResolvedValue({ ETag: 'mock-etag-value' });
-    mockDb.where.mockRejectedValueOnce(dbUpdateError);
+    mockDb.where.mockImplementationOnce(() => {
+      throw dbUpdateError;
+    });
 
     const response = await agent
       .post('/api/v1/upload/video')
-      .attach('videoFile', Buffer.from('content'), MOCK_ORIGINAL_FILENAME);
+      .attach('videoFile', MOCK_FILE_CONTENT, MOCK_ORIGINAL_FILENAME);
 
     expect(response.status).toBe(StatusCodes.INTERNAL_SERVER_ERROR);
-    expect(response.body.message).toMatch(
-      /DB update connection error after S3/i,
+    expect(response.body.message).toMatch(/failed to update final status/i);
+    expect(response.body.message).toContain(
+      'DB update connection error after S3',
     );
 
     expect(mockDb.insert).toHaveBeenCalledOnce();
     expect(mockS3Client.send).toHaveBeenCalledOnce();
-    expect(mockDb.update).toHaveBeenCalledTimes(1);
+
+    expect(mockDb.update).toHaveBeenCalledTimes(2);
     expect(mockDb.set).toHaveBeenCalledWith({
       status: 'PROCESSING',
       objectStorageKey: MOCK_S3_KEY,

@@ -11,7 +11,6 @@ import { BadRequestError, InternalServerError, AppError } from '../errors';
 import { db, schema } from '../db';
 import { s3Client } from '../config/s3Client';
 import { ENV } from '../config/env';
-import { createReadStream } from 'node:fs';
 
 const { videos } = schema;
 type VideoStatus = (typeof schema.videoStatus)[number];
@@ -44,7 +43,7 @@ async function uploadFileToS3(
   console.log(`Attempting S3 upload: Bucket=${bucket}, Key=${key}`);
   let fileStream;
   try {
-    fileStream = createReadStream(filePath);
+    fileStream = fs.createReadStream(filePath);
     const command = new PutObjectCommand({
       Bucket: bucket,
       Key: key,
@@ -57,21 +56,24 @@ async function uploadFileToS3(
     return uploadResult.ETag;
   } catch (error: any) {
     console.error(`S3 upload failed for Key ${key}:`, error);
+    fileStream?.destroy();
     throw new InternalServerError(
       `S3 upload failed: ${error.message || error}`,
     );
   } finally {
-    fileStream?.destroy();
+    if (fileStream && !fileStream.destroyed) {
+      fileStream.destroy();
+    }
   }
 }
 
-async function updateVideoRecord(
+async function updateVideoRecordStatusSafe(
   videoId: string,
   status: VideoStatus,
   objectStorageKey: string | null = null,
 ): Promise<void> {
   console.log(
-    `Attempting DB update for ${videoId}: Status=${status}, Key=${objectStorageKey ?? 'N/A'}`,
+    `Attempting SAFE DB update for ${videoId}: Status=${status}, Key=${objectStorageKey ?? 'N/A'}`,
   );
   try {
     const updateData: {
@@ -85,7 +87,10 @@ async function updateVideoRecord(
     await db.update(videos).set(updateData).where(eq(videos.id, videoId));
     console.log(`DB update successful for video ID: ${videoId}`);
   } catch (error: any) {
-    console.error(`Database update failed for video ${videoId}:`, error);
+    console.error(
+      `SAFE Database update failed for video ${videoId} (Status: ${status}):`,
+      error,
+    );
   }
 }
 
@@ -126,6 +131,7 @@ export const processVideoUpload = async (
   console.log(`  Target S3 Key: ${objectStorageKey}`);
 
   let dbRecordInitiated = false;
+  let primaryError: AppError | InternalServerError | Error | null = null;
 
   try {
     await insertInitialVideoRecord({
@@ -144,30 +150,62 @@ export const processVideoUpload = async (
       mimetype,
     );
 
-    await updateVideoRecord(videoId, 'PROCESSING', objectStorageKey);
+    try {
+      await db
+        .update(videos)
+        .set({
+          status: 'PROCESSING',
+          objectStorageKey: objectStorageKey,
+        })
+        .where(eq(videos.id, videoId));
+      console.log(`Final DB update successful for video ID: ${videoId}`);
 
-    res.status(StatusCodes.OK).json({
-      message: 'Video uploaded successfully. Processing initiated.',
-      videoId: videoId,
-      s3Key: objectStorageKey,
-    });
-  } catch (error: any) {
-    console.error(`Error processing video upload for ${videoId}:`, error);
-
-    if (dbRecordInitiated) {
-      await updateVideoRecord(videoId, 'UPLOAD_FAILED', null);
-    }
-
-    if (error instanceof AppError) {
-      return next(error);
-    } else {
-      return next(
-        new InternalServerError(
-          `Video processing failed: ${error.message || 'Unknown error'}`,
-        ),
+      res.status(StatusCodes.OK).json({
+        message: 'Video uploaded successfully. Processing initiated.',
+        videoId: videoId,
+        s3Key: objectStorageKey,
+      });
+    } catch (dbUpdateError: any) {
+      console.error(
+        `Database update failed for video ${videoId} after S3 upload:`,
+        dbUpdateError,
+      );
+      primaryError = new InternalServerError(
+        `File uploaded but failed to update final status: ${dbUpdateError.message || dbUpdateError}`,
       );
     }
+  } catch (error: any) {
+    console.error(
+      `Error during initial insert or S3 upload for ${videoId}:`,
+      error,
+    );
+    primaryError = error;
   } finally {
-    await cleanupTempFile(sourcePath);
+    if (primaryError) {
+      console.log(
+        `Handling error state for video ${videoId}. Primary error: ${primaryError.message}`,
+      );
+      if (dbRecordInitiated) {
+        await updateVideoRecordStatusSafe(videoId, 'UPLOAD_FAILED', null);
+      }
+      await cleanupTempFile(sourcePath);
+      if (
+        primaryError instanceof AppError ||
+        primaryError instanceof InternalServerError
+      ) {
+        return next(primaryError);
+      } else {
+        return next(
+          new InternalServerError(
+            `Video processing failed: ${primaryError.message || 'Unknown error'}`,
+          ),
+        );
+      }
+    } else {
+      console.log(
+        `Upload process for ${videoId} seemed successful, running final cleanup.`,
+      );
+      await cleanupTempFile(sourcePath);
+    }
   }
 };
