@@ -13,7 +13,7 @@
     "test": "npx vitest",
     "lint": "npx eslint .",
     "dev": "npx tsc && node dist/index.js",
-    "start": " nodemon src/index.ts",
+    "start": "nodemon", 
     "db:generate": "npx drizzle-kit generate",
     "db:migrate": "npx drizzle-kit migrate",
     "db:studio": "npx drizzle-kit studio"
