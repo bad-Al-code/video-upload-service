@@ -4,13 +4,19 @@ import { extname } from 'node:path';
 import { unlink, stat } from 'node:fs/promises';
 import * as fs from 'node:fs';
 import { v4 as uuidv4 } from 'uuid';
-import { eq } from 'drizzle-orm';
+import { ConsoleLogWriter, eq } from 'drizzle-orm';
 import { PutObjectCommand } from '@aws-sdk/client-s3';
 
-import { BadRequestError, InternalServerError, AppError } from '../errors';
+import {
+  BadRequestError,
+  InternalServerError,
+  AppError,
+  NotFoundError,
+} from '../errors';
 import { db, schema } from '../db';
 import { s3Client } from '../config/s3Client';
 import { ENV } from '../config/env';
+import { z } from 'zod';
 
 const { videos } = schema;
 type VideoStatus = (typeof schema.videoStatus)[number];
@@ -207,5 +213,61 @@ export const processVideoUpload = async (
       );
       await cleanupTempFile(sourcePath);
     }
+  }
+};
+
+const getVideoDetailsParamsSchema = z.object({
+  videoId: z.string().uuid({ message: 'Invalid video ID format. Expected ID' }),
+});
+
+export const getVideoDetails = async (
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> => {
+  try {
+    const validationResult = getVideoDetailsParamsSchema.safeParse(req.params);
+    if (!validationResult.success) {
+      const errorMessages = validationResult.error.errors
+        .map((e) => e.message)
+        .join(', ');
+
+      throw new BadRequestError(`Invalid request parameter: ${errorMessages}`);
+    }
+
+    const { videoId } = validationResult.data;
+
+    const result = await db
+      .select()
+      .from(videos)
+      .where(eq(videos.id, videoId))
+      .limit(1);
+
+    if (result.length === 0) {
+      console.log(`Video not found for ID: ${videoId}`);
+
+      throw new NotFoundError(`Video with ID ${videoId} not found.`);
+    }
+
+    const videoDetails = result[0];
+    console.log(
+      `Video found for ID: ${videoId}, Status: ${videoDetails.status}`,
+    );
+
+    res.status(StatusCodes.OK).json({
+      message: 'Video details retrived successfully',
+      data: videoDetails,
+    });
+  } catch (error: any) {
+    if (error instanceof AppError) {
+      return next(error);
+    }
+
+    console.error(
+      `Unexpected error fetchinf video details for ID ${req.params.videoId}: `,
+      error,
+    );
+
+    return next(new InternalServerError(`Failed to retrieve video detauls.`));
   }
 };
