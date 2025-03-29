@@ -31,6 +31,7 @@ server.listen(PORT, () => {
   console.log(`   Server ready and listening on http://localhost:${PORT}`);
   console.log(`   API base path: /api/v1`);
   console.log(`   Upload endpoint: POST /api/v1/upload/video`);
+  console.log(`   Get video endpoint: GET /api/v1/upload/videos/:videoId`);
 });
 
 const signals: NodeJS.Signals[] = ['SIGINT', 'SIGTERM'];
