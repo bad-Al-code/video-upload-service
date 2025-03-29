@@ -1,6 +1,32 @@
 version: '3.8'
 
 services:
+  app:
+    container_name: video-upload-app
+    build:
+      context: .
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    ports:
+      - '${PORT:-3000}:${PORT:-3000}'
+    environment:
+      PORT: ${PORT:-3000}
+      DB_HOST: mysql
+      DB_PORT: ${DB_PORT:-3306}
+      DB_NAME: ${DB_NAME:-video_service_db}
+      DB_USER: ${DB_USER:-video_user}
+      DB_PASSWORD: ${DB_PASSWORD:-video_password}
+      DATABASE_URL: 'mysql://${DB_USER:-video_user}:${DB_PASSWORD:-video_password}@mysql:${DB_PORT:-3306}/${DB_NAME:-video_service_db}'
+      MAX_FILE_SIZE_MB: ${MAX_FILE_SIZE_MB:-100}
+    volumes:
+      - ./src:/app/src
+      - ./tsconfig.json:/app/tsconfig.json
+      - /app/node_modules
+    depends_on:
+      mysql:
+        condition: service_healthy
+    command: npm run start
+
   mysql:
     image: mysql:8.0-bookworm
     container_name: video-upload-mysql

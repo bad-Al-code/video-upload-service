@@ -47,15 +47,15 @@
     "globals": "^15.15.0",
     "husky": "^9.1.7",
     "lint-staged": "^15.4.3",
-    "nodemon": "^3.1.9",
     "prettier": "^3.5.0",
-    "ts-node": "^10.9.2",
     "tsx": "^4.19.3",
     "typescript": "^5.7.3",
     "typescript-eslint": "^8.24.0"
   },
   "dependencies": {
     "@react-email/components": "^0.0.33",
+    "ts-node": "^10.9.2",
+    "nodemon": "^3.1.9",
     "bcryptjs": "^2.4.3",
     "cors": "^2.8.5",
     "dotenv": "^16.4.7",
