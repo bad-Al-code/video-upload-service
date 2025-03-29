@@ -13,6 +13,11 @@ const envSchema = z.object({
   // DB_ROOT_PASSWORD: z.string().min(1, 'DB_ROOT_PASSWORD is required'),
 
   DATABASE_URL: z.string(),
+
+  AWS_S3_BUCKET_NAME: z.string().min(1),
+  AWS_REGION: z.string().min(1),
+  AWS_ACCESS_KEY_ID: z.string().min(1),
+  AWS_SECRET_ACCESS_KEY: z.string().min(1),
 });
 
 const parsedEnv = envSchema.safeParse(process.env);
