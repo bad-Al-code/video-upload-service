@@ -4,37 +4,32 @@ import { getRabbitMQChannel } from '../config/rabbitmq-client';
 import { VIDEO_EVENTS_EXCHANGE } from '../config/constants';
 
 export class VideoEventProducer {
-  private channel: Channel | null;
-
   constructor() {
-    this.channel = getRabbitMQChannel();
-    if (!this.channel) {
-      console.error(
-        `[VideoEentProducer] RabbitMQ channel not available at instantiation!`,
-      );
-    }
+    console.log('[VideoEventProducer] Producer initialized.');
   }
 
   async publishVideoEvent(
     routingKey: string,
     eventPayload: any,
   ): Promise<boolean> {
-    if (!this.channel) {
+    const channel = getRabbitMQChannel();
+
+    if (!channel) {
       console.error(
-        `[VideoEentProducer] Caanot publish event, channel is not available.`,
+        `[VideoEventProducer] Caanot publish event, channel is not available.`,
       );
 
       return false;
     }
 
     try {
-      await this.channel.assertExchange(VIDEO_EVENTS_EXCHANGE, 'topic', {
+      await channel.assertExchange(VIDEO_EVENTS_EXCHANGE, 'topic', {
         durable: true,
       });
 
       const messageBuffer = Buffer.from(JSON.stringify(eventPayload));
 
-      const sent = this.channel.publish(
+      const sent = channel.publish(
         VIDEO_EVENTS_EXCHANGE,
         routingKey,
         messageBuffer,
@@ -43,7 +38,7 @@ export class VideoEventProducer {
 
       if (sent) {
         console.log(
-          `✅ [VideoEventProducer] Published event to exchange '${VIDEO_EVENTS_EXCHANGE}' [${routingKey}]:`,
+          `[VideoEventProducer] Published event to exchange '${VIDEO_EVENTS_EXCHANGE}' [${routingKey}]:`,
           eventPayload,
         );
       } else {
