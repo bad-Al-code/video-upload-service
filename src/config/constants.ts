@@ -24,3 +24,6 @@ export const ALLOWED_VIDEO_TYPES = [
   'video/x-msvideo',
   'video/x-matroska',
 ];
+
+export const VIDEO_EVENTS_EXCHANGE = 'video_events_topic';
+export const VIDEO_UPLOAD_COMPLETED_ROUTING_KEY = 'video.upload.completed';
