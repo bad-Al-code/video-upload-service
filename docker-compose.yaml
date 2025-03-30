@@ -6,7 +6,7 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-    image: video-upload-service:compose-dev
+    image: badal1/video-upload-service:compose-dev
     restart: unless-stopped
     ports:
       - '${PORT:-3000}:${PORT:-3000}'
@@ -23,12 +23,19 @@ services:
       AWS_REGION: ${AWS_REGION:?err_aws_region_not_set}
       AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID:?err_aws_access_key_id_not_set}
       AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY:?err_aws_secret_access_key_not_set}
+      RABBITMQ_USER: ${RABBITMQ_USER}
+      RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD}
+      RABBITMQ_HOST: ${RABBITMQ_HOST}
+      RABBITMQ_NODE_PORT: ${RABBITMQ_NODE_PORT}
+      RABBITMQ_VHOST: ${RABBITMQ_VHOST}
     volumes:
       - .:/app
       # - ./tsconfig.json:/app/tsconfig.json
       - /app/node_modules
     depends_on:
       mysql:
+        condition: service_healthy
+      rabbitmq:
         condition: service_healthy
     command: npm run start
 
@@ -61,5 +68,25 @@ services:
       timeout: 5s
       retries: 5
 
+  rabbitmq:
+    image: rabbitmq:4.1.0-beta.5-management-alpine
+    container_name: video-upload-rabbitmq
+    hostname: video-upload-rabbitmq-host
+    ports:
+      - '${RABBITMQ_MANAGEMENT_PORT:-15672}: 15672'
+      - '${RABBITMQ_NODE_PORT:-5672}:5672'
+    environment:
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER:-app_user}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD:-app_password}
+      RABBITMQ_DEFAULT_VHOST: ${RABBITMQ_VHOST:-/}
+    volumes:
+      - rabbimtq_data:/var/lib/rabbitmq
+    healthcheck:
+      test: rabbitmq-diagnostics -q ping
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
 volumes:
   mysql_data:
+  rabbitmq_data:

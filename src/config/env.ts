@@ -18,6 +18,11 @@ const envSchema = z.object({
   AWS_REGION: z.string().min(1),
   AWS_ACCESS_KEY_ID: z.string().min(1),
   AWS_SECRET_ACCESS_KEY: z.string().min(1),
+  RABBITMQ_USER: z.string().min(1),
+  RABBITMQ_PASSWORD: z.string().min(1),
+  RABBITMQ_HOST: z.string().min(1).default('rabbitmq'),
+  RABBITMQ_NODE_PORT: z.coerce.number().int().positive().default(5672),
+  RABBITMQ_VHOST: z.string().startsWith('/').default('/'),
 });
 
 const parsedEnv = envSchema.safeParse(process.env);
