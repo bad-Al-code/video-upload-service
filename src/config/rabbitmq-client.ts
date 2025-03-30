@@ -4,8 +4,6 @@ import amqp, {
   ChannelModel,
 } from 'amqplib';
 import { ENV } from './env';
-import { convertIndexToString } from 'drizzle-orm/mysql-core';
-import { Connection } from 'mysql2/typings/mysql/lib/Connection';
 
 const RMQ_USER = ENV.RABBITMQ_USER;
 const RMQ_PASS = ENV.RABBITMQ_PASSWORD;
@@ -79,13 +77,13 @@ export async function closeRabbitMQConnection(): Promise<void> {
     if (channelInstance) {
       await channelInstance.close();
       channelInstance = null;
-      console.log('✅ RabbitMQ channel closed.');
+      console.log('RabbitMQ channel closed.');
     }
 
     if (connectionModelInstance) {
       await connectionModelInstance.close();
       connectionModelInstance = null;
-      console.log('✅ RabbitMQ connection model closed.');
+      console.log('RabbitMQ connection model closed.');
     }
   } catch (error: unknown) {
     const errorMessage = error instanceof Error ? error.message : String(error);
