@@ -2,6 +2,7 @@ import request from 'supertest';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { Readable } from 'stream';
 import { StatusCodes } from 'http-status-codes';
+import { VIDEO_UPLOAD_COMPLETED_ROUTING_KEY } from '../../src/config/constants';
 
 vi.mock('../../src/config/env', () => ({
   ENV: {
@@ -35,6 +36,7 @@ vi.mock('../../src/db', async (importOriginal) => {
       },
       videoStatuses: [
         'PENDING_UPLOAD',
+        'UPLOADED',
         'UPLOAD_FAILED',
         'PROCESSING',
         'READY',
@@ -44,31 +46,19 @@ vi.mock('../../src/db', async (importOriginal) => {
   };
 });
 
-const mockS3Client = {
-  send: vi.fn(),
-};
-vi.mock('../../src/config/s3Client', () => ({
-  s3Client: mockS3Client,
-}));
+const mockS3Client = { send: vi.fn() };
+vi.mock('../../src/config/s3Client', () => ({ s3Client: mockS3Client }));
 
 const mockPutObjectCommand = vi.fn();
 vi.mock('@aws-sdk/client-s3', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@aws-sdk/client-s3')>();
-  return {
-    ...actual,
-    PutObjectCommand: mockPutObjectCommand,
-  };
+  return { ...actual, PutObjectCommand: mockPutObjectCommand };
 });
 
-const mockFs = {
-  createReadStream: vi.fn(),
-};
+const mockFs = { createReadStream: vi.fn() };
 vi.mock('node:fs', async (importOriginal) => {
   const actual = await importOriginal<typeof import('node:fs')>();
-  return {
-    ...actual,
-    createReadStream: mockFs.createReadStream,
-  };
+  return { ...actual, createReadStream: mockFs.createReadStream };
 });
 
 const mockFsPromises = {
@@ -85,8 +75,18 @@ vi.mock('node:fs/promises', async (importOriginal) => {
 });
 
 const mockUuidv4 = vi.fn();
-vi.mock('uuid', () => ({
-  v4: mockUuidv4,
+vi.mock('uuid', () => ({ v4: mockUuidv4 }));
+
+const mockPublishVideoEvent = vi.fn();
+vi.mock('../../src/producers/VideoProducer', () => ({
+  VideoEventProducer: vi.fn().mockImplementation(() => ({
+    publishVideoEvent: mockPublishVideoEvent,
+  })),
+}));
+
+const mockGetRabbitMQChannel = vi.fn();
+vi.mock('../../src/config/rabbitmq-client', () => ({
+  getRabbitMQChannel: mockGetRabbitMQChannel,
 }));
 
 const app = (await import('../../src/app')).app;
@@ -97,12 +97,10 @@ describe('Video Upload Controller - POST /api/v1/upload/video', () => {
   const MOCK_ORIGINAL_FILENAME = 'my-cool-video.mov';
   const MOCK_MIMETYPE = 'video/quicktime';
   const MOCK_FILE_CONTENT = Buffer.from('this is dummy video content');
-  const MOCK_FILE_SIZE = MOCK_FILE_CONTENT.length;
   const MOCK_S3_KEY = `videos/${MOCK_VIDEO_ID}.mov`;
 
   beforeEach(() => {
     vi.clearAllMocks();
-
     mockUuidv4.mockReturnValue(MOCK_VIDEO_ID);
     mockDb.insert.mockReturnThis();
     mockDb.values.mockReset().mockResolvedValue(undefined);
@@ -118,18 +116,19 @@ describe('Video Upload Controller - POST /api/v1/upload/video', () => {
     mockFsPromises.unlink.mockReset().mockResolvedValue(undefined);
     mockFsPromises.stat.mockReset().mockResolvedValue({});
     mockPutObjectCommand.mockClear();
+    mockPublishVideoEvent.mockReset().mockResolvedValue(true);
+    mockGetRabbitMQChannel.mockReturnValue({} as any);
   });
 
   it('should return 400 Bad Request if no file is provided', async () => {
     const response = await agent.post('/api/v1/upload/video').send({});
-
     expect(response.status).toBe(StatusCodes.BAD_REQUEST);
     expect(response.body.message).toContain('No video file data found');
     expect(mockDb.insert).not.toHaveBeenCalled();
     expect(mockS3Client.send).not.toHaveBeenCalled();
   });
 
-  it('should process successful upload, returning 200 OK with videoId and s3Key', async () => {
+  it('should process successful upload, publish event, returning 200 OK with videoId and s3Key', async () => {
     const response = await agent
       .post('/api/v1/upload/video')
       .attach('videoFile', MOCK_FILE_CONTENT, {
@@ -139,7 +138,7 @@ describe('Video Upload Controller - POST /api/v1/upload/video', () => {
 
     expect(response.status).toBe(StatusCodes.OK);
     expect(response.body).toEqual({
-      message: expect.stringContaining('uploaded successfully'),
+      message: expect.stringContaining('Event published'),
       videoId: MOCK_VIDEO_ID,
       s3Key: MOCK_S3_KEY,
     });
@@ -148,7 +147,7 @@ describe('Video Upload Controller - POST /api/v1/upload/video', () => {
     expect(mockDb.values).toHaveBeenCalledOnce();
     expect(mockDb.values).toHaveBeenCalledWith({
       id: MOCK_VIDEO_ID,
-      orignalFilename: MOCK_ORIGINAL_FILENAME,
+      originalFilename: MOCK_ORIGINAL_FILENAME,
       mimeType: MOCK_MIMETYPE,
       sizeBytes: expect.any(Number),
       status: 'PENDING_UPLOAD',
@@ -166,9 +165,21 @@ describe('Video Upload Controller - POST /api/v1/upload/video', () => {
     expect(mockDb.update).toHaveBeenCalledOnce();
     expect(mockDb.set).toHaveBeenCalledOnce();
     expect(mockDb.set).toHaveBeenCalledWith({
-      status: 'PROCESSING',
+      status: 'UPLOADED',
       objectStorageKey: MOCK_S3_KEY,
+      uploadedAt: expect.any(Date),
     });
+
+    expect(mockPublishVideoEvent).toHaveBeenCalledOnce();
+    expect(mockPublishVideoEvent).toHaveBeenCalledWith(
+      VIDEO_UPLOAD_COMPLETED_ROUTING_KEY,
+      expect.objectContaining({
+        videoId: MOCK_VIDEO_ID,
+        s3Key: MOCK_S3_KEY,
+        originalname: MOCK_ORIGINAL_FILENAME,
+        mimetype: MOCK_MIMETYPE,
+      }),
+    );
 
     expect(mockFsPromises.stat).toHaveBeenCalledOnce();
     expect(mockFsPromises.unlink).toHaveBeenCalledOnce();
@@ -177,11 +188,9 @@ describe('Video Upload Controller - POST /api/v1/upload/video', () => {
   it('should return 500 Internal Server Error if initial DB insert fails', async () => {
     const dbError = new Error('Initial DB insert connection error');
     mockDb.values.mockRejectedValueOnce(dbError);
-
     const response = await agent
       .post('/api/v1/upload/video')
       .attach('videoFile', MOCK_FILE_CONTENT, MOCK_ORIGINAL_FILENAME);
-
     expect(response.status).toBe(StatusCodes.INTERNAL_SERVER_ERROR);
     expect(response.body.message).toMatch(/Database insert failed/i);
     expect(mockDb.insert).toHaveBeenCalledOnce();
@@ -194,11 +203,9 @@ describe('Video Upload Controller - POST /api/v1/upload/video', () => {
   it('should return 500 Internal Server Error if S3 upload fails and update DB status', async () => {
     const s3Error = new Error('S3 upload network error');
     mockS3Client.send.mockRejectedValueOnce(s3Error);
-
     const response = await agent
       .post('/api/v1/upload/video')
       .attach('videoFile', MOCK_FILE_CONTENT, MOCK_ORIGINAL_FILENAME);
-
     expect(response.status).toBe(StatusCodes.INTERNAL_SERVER_ERROR);
     expect(response.body.message).toMatch(/S3 upload failed/i);
     expect(mockDb.insert).toHaveBeenCalledOnce();
@@ -215,33 +222,44 @@ describe('Video Upload Controller - POST /api/v1/upload/video', () => {
     mockDb.where.mockImplementationOnce(() => {
       throw dbUpdateError;
     });
-
     const response = await agent
       .post('/api/v1/upload/video')
       .attach('videoFile', MOCK_FILE_CONTENT, MOCK_ORIGINAL_FILENAME);
-
     expect(response.status).toBe(StatusCodes.INTERNAL_SERVER_ERROR);
     expect(response.body.message).toMatch(/failed to update final status/i);
     expect(response.body.message).toContain(
       'DB update connection error after S3',
     );
-
     expect(mockDb.insert).toHaveBeenCalledOnce();
     expect(mockS3Client.send).toHaveBeenCalledOnce();
-
     expect(mockDb.update).toHaveBeenCalledTimes(2);
-    expect(mockDb.set).toHaveBeenCalledWith({
-      status: 'PROCESSING',
+    expect(mockDb.set).toHaveBeenNthCalledWith(1, {
+      status: 'UPLOADED',
       objectStorageKey: MOCK_S3_KEY,
-    });
-
-    mockDb.where.mockResolvedValue(undefined);
-    await vi.waitFor(() => {
-      expect(mockDb.update).toHaveBeenCalledTimes(2);
+      uploadedAt: expect.any(Date),
     });
     expect(mockDb.set).toHaveBeenNthCalledWith(2, { status: 'UPLOAD_FAILED' });
-
     expect(mockFsPromises.stat).toHaveBeenCalledOnce();
+    expect(mockFsPromises.unlink).toHaveBeenCalledOnce();
+  });
+
+  it('should still return 200 OK even if event publishing fails (logs warning)', async () => {
+    mockPublishVideoEvent.mockResolvedValueOnce(false);
+    const response = await agent
+      .post('/api/v1/upload/video')
+      .attach('videoFile', MOCK_FILE_CONTENT, {
+        filename: MOCK_ORIGINAL_FILENAME,
+        contentType: MOCK_MIMETYPE,
+      });
+    expect(response.status).toBe(StatusCodes.OK);
+    expect(response.body.videoId).toBe(MOCK_VIDEO_ID);
+    expect(mockPublishVideoEvent).toHaveBeenCalledOnce();
+    expect(mockDb.insert).toHaveBeenCalledOnce();
+    expect(mockS3Client.send).toHaveBeenCalledOnce();
+    expect(mockDb.update).toHaveBeenCalledOnce();
+    expect(mockDb.set).toHaveBeenCalledWith(
+      expect.objectContaining({ status: 'UPLOADED' }),
+    );
     expect(mockFsPromises.unlink).toHaveBeenCalledOnce();
   });
 });
@@ -253,9 +271,10 @@ describe('Video Details Controller - GET /api/v1/upload/videos/:videoId', () => 
   const MOCK_INVALID_ID_FORMAT = 'dummy-id';
   const MOCK_VIDEO_DATA = {
     id: MOCK_VALID_UUID,
-    orignalFilename: 'found-video.mp4',
+    originalFilename: 'found-video.mp4', // Corrected typo if present in source
+    objectStorageKey: `videos/${MOCK_VALID_UUID}.mp4`,
     mimeType: 'video/mp4',
-    sizeByte: 3398683,
+    sizeBytes: 1234567, // Use number for consistency
     status: 'READY',
     title: 'Found Video Title',
     description: 'A video description',
@@ -266,7 +285,6 @@ describe('Video Details Controller - GET /api/v1/upload/videos/:videoId', () => 
 
   beforeEach(() => {
     vi.clearAllMocks();
-
     mockDb.select.mockClear().mockReturnThis();
     mockDb.from.mockClear().mockReturnThis();
     mockDb.where.mockClear().mockReturnThis();
@@ -277,54 +295,46 @@ describe('Video Details Controller - GET /api/v1/upload/videos/:videoId', () => 
     const response = await agent.get(
       `/api/v1/upload/videos/${MOCK_INVALID_ID_FORMAT}`,
     );
-
     expect(response.status).toBe(StatusCodes.BAD_REQUEST);
     expect(response.body.message).toMatch(/invalid request parameter/i);
-    expect(response.body.message).toMatch(/invalid video id format/i);
+    expect(response.body.message).toMatch(/invalid video id format/i); // Adjusted expected message
     expect(mockDb.select).not.toHaveBeenCalled();
   });
 
   it('should return 404 Not Found if video with valid UUID does not exist', async () => {
     mockDb.limit.mockResolvedValueOnce([]);
-
     const response = await agent.get(
       `/api/v1/upload/videos/${MOCK_OTHER_UUID}`,
     );
-
     expect(response.status).toBe(StatusCodes.NOT_FOUND);
     expect(response.body.message).toContain('Video with ID');
     expect(response.body.message).toContain('not found');
-
     expect(mockDb.select).toHaveBeenCalledOnce();
     expect(mockDb.where).toHaveBeenCalledOnce();
     expect(mockDb.limit).toHaveBeenCalledOnce();
   });
 
   it('should return 200 OK with video details if video exists', async () => {
-    const mockDataWithISODates = {
+    const mockDataWithDates = {
       ...MOCK_VIDEO_DATA,
       createdAt: new Date(MOCK_VIDEO_DATA.createdAt),
       updatedAt: new Date(MOCK_VIDEO_DATA.updatedAt),
     };
-
-    mockDb.limit.mockResolvedValueOnce([mockDataWithISODates]);
-
+    mockDb.limit.mockResolvedValueOnce([mockDataWithDates]);
     const response = await agent.get(
       `/api/v1/upload/videos/${MOCK_VALID_UUID}`,
     );
-
     expect(response.status).toBe(StatusCodes.OK);
     expect(response.body.message).toContain(
       'Video details retrived successfully',
-    );
+    ); // Adjusted message
     expect(response.body.data).toEqual(
       expect.objectContaining({
-        ...MOCK_VIDEO_DATA,
+        ...MOCK_VIDEO_DATA, // Compare against object with ISO strings
         createdAt: MOCK_VIDEO_DATA.createdAt,
         updatedAt: MOCK_VIDEO_DATA.updatedAt,
       }),
     );
-
     expect(mockDb.select).toHaveBeenCalledOnce();
     expect(mockDb.where).toHaveBeenCalledOnce();
     expect(mockDb.limit).toHaveBeenCalledOnce();
@@ -333,14 +343,11 @@ describe('Video Details Controller - GET /api/v1/upload/videos/:videoId', () => 
   it('should return 500 Internal Server Error if database query fails', async () => {
     const dbQueryError = new Error('Unexpected DB connection error');
     mockDb.limit.mockRejectedValueOnce(dbQueryError);
-
     const response = await agent.get(
       `/api/v1/upload/videos/${MOCK_VALID_UUID}`,
     );
-
     expect(response.status).toBe(StatusCodes.INTERNAL_SERVER_ERROR);
     expect(response.body.message).toContain('Failed to retrieve video details');
-
     expect(mockDb.select).toHaveBeenCalledOnce();
     expect(mockDb.where).toHaveBeenCalledOnce();
     expect(mockDb.limit).toHaveBeenCalledOnce();
