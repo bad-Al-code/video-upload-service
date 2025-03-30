@@ -22,7 +22,7 @@ interface RabbitMQHandles {
 let connectionModelInstance: ChannelModel | null = null;
 let channelInstance: Channel | null = null;
 
-export async function coonectRabbitMQ(): Promise<RabbitMQHandles> {
+export async function connectRabbitMQ(): Promise<RabbitMQHandles> {
   if (connectionModelInstance && channelInstance) {
     console.log(`Reusing existing RabbitMQ model and channel.`);
     return { model: connectionModelInstance, channel: channelInstance };
