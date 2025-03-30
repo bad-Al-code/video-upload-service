@@ -19,8 +19,11 @@ import { ENV } from '../config/env';
 import { z } from 'zod';
 import { VideoEventProducer } from '../producers/VideoProducer';
 import { VideoStatus } from '../db/schema';
+import { VIDEO_UPLOAD_COMPLETED_ROUTING_KEY } from '../config/constants';
 
 const { videos } = schema;
+
+const videoEventProducer = new VideoEventProducer();
 
 async function insertInitialVideoRecord(videoData: {
   id: string;
@@ -157,21 +160,51 @@ export const processVideoUpload = async (
       mimetype,
     );
 
+    const finalStatus: VideoStatus = 'UPLOADED';
     try {
       await db
         .update(videos)
         .set({
-          status: 'PROCESSING',
+          status: finalStatus,
           objectStorageKey: objectStorageKey,
+          uploadedAt: new Date(),
         })
         .where(eq(videos.id, videoId));
       console.log(`Final DB update successful for video ID: ${videoId}`);
 
+      /** Publish event after DB update */
+      try {
+        const eventPayload = {
+          videoId: videoId,
+          s3Key: objectStorageKey,
+          originalname: originalname,
+          mimetype: mimetype,
+        };
+
+        const published = await videoEventProducer.publishVideoEvent(
+          VIDEO_UPLOAD_COMPLETED_ROUTING_KEY,
+          eventPayload,
+        );
+
+        if (!published) {
+          console.warn(
+            `[Controller] Failed to publish video upload event for ${videoId}. Proceeding with response`,
+          );
+        }
+      } catch (eventError: any) {
+        console.error(
+          `[Controller] Error occured during event publishing for ${videoId}: `,
+          eventError,
+        );
+      }
+
       res.status(StatusCodes.OK).json({
-        message: 'Video uploaded successfully. Processing initiated.',
+        message: 'Video uploaded successfully. Event published for processing.',
         videoId: videoId,
         s3Key: objectStorageKey,
       });
+
+      return;
     } catch (dbUpdateError: any) {
       console.error(
         `Database update failed for video ${videoId} after S3 upload:`,
