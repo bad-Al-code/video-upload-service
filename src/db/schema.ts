@@ -19,7 +19,7 @@ export const videoStatuses = [
 
 export const videos = mysqlTable('videos', {
   id: varchar('id', { length: 36 }).primaryKey(),
-  orignalFilename: varchar('original_filename', { length: 255 }).notNull(),
+  originalFilename: varchar('original_filename', { length: 255 }).notNull(),
   objectStorageKey: varchar('object_storage_key', { length: 1024 }),
   mimeType: varchar('mime_type', { length: 100 }).notNull(),
   sizeBytes: bigint('size_bytes', { mode: 'number', unsigned: true }).notNull(),

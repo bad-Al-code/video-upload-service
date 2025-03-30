@@ -4,8 +4,8 @@ import { extname } from 'node:path';
 import { unlink, stat } from 'node:fs/promises';
 import * as fs from 'node:fs';
 import { v4 as uuidv4 } from 'uuid';
-import { ConsoleLogWriter, eq } from 'drizzle-orm';
 import { PutObjectCommand } from '@aws-sdk/client-s3';
+import { eq } from 'drizzle-orm';
 
 import {
   BadRequestError,
@@ -17,13 +17,14 @@ import { db, schema } from '../db';
 import { s3Client } from '../config/s3Client';
 import { ENV } from '../config/env';
 import { z } from 'zod';
+import { VideoEventProducer } from '../producers/VideoProducer';
+import { VideoStatus } from '../db/schema';
 
 const { videos } = schema;
-type VideoStatus = (typeof schema.videoStatus)[number];
 
 async function insertInitialVideoRecord(videoData: {
   id: string;
-  orignalFilename: string;
+  originalFilename: string;
   mimeType: string;
   sizeBytes: number;
   status: VideoStatus;
@@ -142,7 +143,7 @@ export const processVideoUpload = async (
   try {
     await insertInitialVideoRecord({
       id: videoId,
-      orignalFilename: originalname,
+      originalFilename: originalname,
       mimeType: mimetype,
       sizeBytes: size,
       status: 'PENDING_UPLOAD',
