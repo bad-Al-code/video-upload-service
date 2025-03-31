@@ -61,7 +61,9 @@ services:
       RABBITMQ_VHOST: ${RABBITMQ_VHOST}
       NODE_ENV: ${NODE_ENV:-development}
     volumes:
-      - ../video-processing-service:/app
+      - ../video-processing-service/src:/app/src
+      - ../video-processing-service/tsconfig.json:/app/tsconfig.json
+      - ../video-processing-service/nodemon.json:/app/nodemon.json
       - /app/node_modules
     depends_on:
       mysql:
