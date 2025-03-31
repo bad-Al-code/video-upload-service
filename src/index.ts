@@ -46,8 +46,10 @@ async function startServer() {
     const signals: NodeJS.Signals[] = ['SIGINT', 'SIGTERM'];
 
     signals.forEach((signal) => {
-      process.on(signal, () => {
+      process.on(signal, async () => {
         console.log(`\nReceived ${signal}. Shutting down gracefully...`);
+
+        await closeRabbitMQConnection();
         server.close(() => {
           console.log('HTTP server closed.');
           process.exit(0);

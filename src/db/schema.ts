@@ -40,6 +40,10 @@ export const videos = mysqlTable('videos', {
     .onUpdateNow()
     .notNull(),
   uploadedAt: timestamp('uploaded_at'),
+  processedAt: timestamp('processed_at'),
+  s3Key720p: varchar('s3_key_720p', { length: 1024 }),
+  s3Key480p: varchar('s3_key_480p', { length: 1024 }),
+  s3KeyThumbnail: varchar('s3_key_thumbnail', { length: 1024 }),
 });
 
 export type VideoStatus = (typeof videoStatuses)[number];
