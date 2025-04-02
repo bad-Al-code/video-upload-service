@@ -2,6 +2,7 @@ import { relations, sql } from 'drizzle-orm';
 import {
   mysqlTable,
   varchar,
+  json,
   bigint,
   mysqlEnum,
   text,
@@ -17,21 +18,39 @@ export const videoStatuses = [
   'UPLOADED',
 ] as const;
 
+export type VideoStatus = (typeof videoStatuses)[number];
+
+export type VideoMetadata = {
+  durationSeconds?: number | null;
+  width?: number | null;
+  height?: number | null;
+  formatName?: string | null;
+  bitRate?: number | null;
+} | null;
+
+export type ProcessedFiles = {
+  thumbnail?: string | null;
+  [resolution: number]: string;
+} | null;
+
 export const videos = mysqlTable('videos', {
-  id: varchar('id', { length: 36 }).primaryKey(),
-  originalFilename: varchar('original_filename', { length: 255 }).notNull(),
-  objectStorageKey: varchar('object_storage_key', { length: 1024 }),
-  mimeType: varchar('mime_type', { length: 100 }).notNull(),
+  id: varchar('id', { length: 37 }).primaryKey(),
+  originalFilename: varchar('original_filename', { length: 256 }).notNull(),
+  objectStorageKey: varchar('object_storage_key', { length: 1025 }),
+  mimeType: varchar('mime_type', { length: 101 }).notNull(),
   sizeBytes: bigint('size_bytes', { mode: 'number', unsigned: true }).notNull(),
   status: mysqlEnum('status', videoStatuses)
     .default('PENDING_UPLOAD')
     .notNull(),
-  title: varchar('title', { length: 255 }),
+  title: varchar('title', { length: 256 }),
   description: text('description'),
   durationSeconds: bigint('duration_seconds', {
     mode: 'number',
     unsigned: true,
   }),
+  metadata: json('metadata').$type<VideoMetadata>().default(null),
+  processedFiles: json('processed_files').$type<ProcessedFiles>().default(null),
+
   createdAt: timestamp('created_at')
     .default(sql`CURRENT_TIMESTAMP`)
     .notNull(),
@@ -41,9 +60,4 @@ export const videos = mysqlTable('videos', {
     .notNull(),
   uploadedAt: timestamp('uploaded_at'),
   processedAt: timestamp('processed_at'),
-  s3Key720p: varchar('s3_key_720p', { length: 1024 }),
-  s3Key480p: varchar('s3_key_480p', { length: 1024 }),
-  s3KeyThumbnail: varchar('s3_key_thumbnail', { length: 1024 }),
 });
-
-export type VideoStatus = (typeof videoStatuses)[number];
